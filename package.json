@@ -1,0 +1,17 @@
+{
+  "name": "hitojichi-task-kyotei",
+  "private": true,
+  "workspaces": ["web", "functions", "shared"],
+  "scripts": {
+    "dev": "npm run dev -w web",
+    "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit",
+    "build": "npm run build -w web && npm run build -w functions",
+    "lint": "npm run lint -w web",
+    "format": "prettier --write \"web/src/**/*.{ts,vue}\" \"functions/src/**/*.ts\" \"shared/**/*.ts\"",
+    "deploy": "npm run build && firebase deploy"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.31.0",
+    "prettier": "3.9.6"
+  }
+}

@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// ⚠ 初版です。メンバー2がEmulatorで検証しながら固めてください。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(teamId) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/teams/$(teamId)).data.memberIds;
+    }
+
+    // プロフィール：ログインユーザーなら閲覧可、本人のみ更新可。称号(titleIds)はFunctionsのみ変更可
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.titleIds.size() == 0;
+      allow update: if signedIn() && request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['titleIds']);
+    }
+
+    // チーム：メンバーのみ閲覧・更新可
+    // TODO: 招待コードでの参加方法（Functions経由にするか）を決める
+    match /teams/{teamId} {
+      allow read, update: if isMember(teamId);
+      allow create: if signedIn() && request.auth.uid in request.resource.data.memberIds;
+
+      // タスク：チームメンバーのみ
+      match /tasks/{taskId} {
+        allow read, write: if isMember(teamId);
+      }
+    }
+
+    // 称号マスタ：読み取りのみ（投入はシードスクリプト／管理者）
+    match /titles/{titleId} {
+      allow read: if signedIn();
+    }
+  }
+}

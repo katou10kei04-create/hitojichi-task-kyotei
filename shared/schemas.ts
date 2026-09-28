@@ -32,6 +32,16 @@ export const taskSchema = z.object({
 })
 export type Task = z.infer<typeof taskSchema>
 
+/** teams/{teamId}/disAssignments/{targetUserId}
+ *  targetUserId = このDIS称号を付けられるユーザー
+ */
+export const disAssignmentSchema = z.object({
+  assignedBy: z.string().min(1), // このDIS称号を決めた相手
+  titleId: z.string().min(1), // 選ばれたDIS称号
+  calledCount: z.number().int().min(0), // 呼ばれた累計回数
+})
+export type DisAssignment = z.infer<typeof disAssignmentSchema>
+
 /** titles/{titleId}（称号マスタ） */
 export const titleSchema = z.object({
   name: z.string(),

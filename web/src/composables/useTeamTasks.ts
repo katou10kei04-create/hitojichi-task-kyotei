@@ -1,9 +1,28 @@
-import { addDoc, collection, doc, updateDoc, type CollectionReference } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  updateDoc,
+  type CollectionReference,
+} from 'firebase/firestore'
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useCollection, useDocument, useFirestore } from 'vuefire'
-import { taskSchema, type Task, type Team } from '@hitojichi/shared'
+import {
+  createTaskInput,
+  taskSchema,
+  type Task,
+  type Team,
+} from '@hitojichi/shared'
 
-/** チーム詳細（メンバー等）とチーム内タスクの取得・作成・状態更新をまとめたcomposable */
+type TaskInput = {
+  title: string
+  assigneeId: string
+  hostageId: string
+  dueAt: Date
+}
+
+/** チーム詳細とチーム内タスクのCRUDをまとめたcomposable */
 export function useTeamTasks(teamId: MaybeRefOrGetter<string>) {
   const db = useFirestore()
 
@@ -11,25 +30,66 @@ export function useTeamTasks(teamId: MaybeRefOrGetter<string>) {
   const team = useDocument<Team>(teamRef)
 
   const tasksRef = computed(
-    () => collection(db, 'teams', toValue(teamId), 'tasks') as CollectionReference<Task>,
+    () =>
+      collection(
+        db,
+        'teams',
+        toValue(teamId),
+        'tasks',
+      ) as CollectionReference<Task>,
   )
+
+  // Read
   const tasks = useCollection<Task>(tasksRef)
 
-  async function createTask(input: {
-    title: string
-    assigneeId: string
-    hostageId: string
-    dueAt: Date
-  }) {
-    const task = taskSchema.parse({ ...input, status: 'todo' })
-    await addDoc(collection(db, 'teams', toValue(teamId), 'tasks'), task)
-  }
+  // Create
+  async function createTask(input: TaskInput) {
+    const validatedInput = createTaskInput.parse(input)
 
-  async function completeTask(taskId: string) {
-    await updateDoc(doc(db, 'teams', toValue(teamId), 'tasks', taskId), {
-      status: 'done',
+    const task = taskSchema.parse({
+      ...validatedInput,
+      status: 'todo',
     })
+
+    await addDoc(
+      collection(db, 'teams', toValue(teamId), 'tasks'),
+      task,
+    )
   }
 
-  return { team, tasks, createTask, completeTask }
+  // Update
+  async function updateTask(taskId: string, input: TaskInput) {
+    const validatedInput = createTaskInput.parse(input)
+
+    await updateDoc(
+      doc(db, 'teams', toValue(teamId), 'tasks', taskId),
+      validatedInput,
+    )
+  }
+
+  // Update status
+  async function completeTask(taskId: string) {
+    await updateDoc(
+      doc(db, 'teams', toValue(teamId), 'tasks', taskId),
+      {
+        status: 'done',
+      },
+    )
+  }
+
+  // Delete
+  async function deleteTask(taskId: string) {
+    await deleteDoc(
+      doc(db, 'teams', toValue(teamId), 'tasks', taskId),
+    )
+  }
+
+  return {
+    team,
+    tasks,
+    createTask,
+    updateTask,
+    completeTask,
+    deleteTask,
+  }
 }

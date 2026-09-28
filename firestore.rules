@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// ⚠ 初版です。メンバー2がEmulatorで検証しながら固めてください。
+// ⚠ 初版です。Emulatorで検証しながら固めてください。
 service cloud.firestore {
   match /databases/{database}/documents {
 

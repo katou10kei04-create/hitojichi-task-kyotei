@@ -35,14 +35,6 @@ firestore.rules  Security Rules
 
 `shared/` は `import { ... } from '@hitojichi/shared'` で読み込めます。
 
-## 担当
-
-| 画面・領域                                                     | 担当      |
-| -------------------------------------------------------------- | --------- |
-| ログイン、チーム一覧、新規チーム作成、タスク管理、プロフィール | ぬ        |
-| 称号一覧、称号マスタ、文言                                     | メンバー1 |
-| Firestore、Security Rules、Functions                           | メンバー2 |
-
 ## 本番環境への切り替え
 
 Firebaseプロジェクト作成後に以下を実行し、`web/.env.local` を本番の値に書き換えます。

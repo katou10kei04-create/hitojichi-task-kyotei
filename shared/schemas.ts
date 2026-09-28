@@ -59,3 +59,8 @@ export const createTaskInput = taskSchema.pick({
   hostageId: true,
   dueAt: true,
 })
+/** DIS称号設定の作成入力 */
+export const createDisAssignmentInput = disAssignmentSchema.pick({
+  assignedBy: true,
+  titleId: true,
+})

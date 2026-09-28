@@ -25,8 +25,8 @@ export type Team = z.infer<typeof teamSchema>
 export const taskStatusSchema = z.enum(['todo', 'done', 'overdue'])
 export const taskSchema = z.object({
   title: z.string().min(1).max(100),
-  assigneeId: z.string(),
-  hostageId: z.string(), // 人質になる仲間
+  assigneeId: z.string().min(1),
+  hostageId: z.string().min(1), // 人質になる仲間
   dueAt: z.date(),
   status: taskStatusSchema,
 })
@@ -41,6 +41,7 @@ export const titleSchema = z.object({
 export type Title = z.infer<typeof titleSchema>
 
 /** フォーム入力用 */
+export const updateUserProfileInput = userSchema.pick({ displayName: true })
 export const createTeamInput = teamSchema.pick({ name: true })
 export const createTaskInput = taskSchema.pick({
   title: true,

@@ -24,17 +24,6 @@ function getDisAssignmentRef(teamId: string, userId: string) {
 	return db.doc(`teams/${teamId}/disAssignments/${userId}`)
 }
 
-async function getDisAssignment(teamId: string, userId: string) {
-	const ref = getDisAssignmentRef(teamId, userId)
-	const snap = await ref.get()
-
-	if (!snap.exists) {
-		return null
-	}
-
-	return snap.data()
-}
-
 async function processOverdueTasks() {
 	const now = Timestamp.now()
 
@@ -145,6 +134,3 @@ export const checkOverdueTasks = onSchedule(
 		await processOverdueTasks()
 	},
 )
-
-// TODO(メンバー2): 称号判定
-// 例: onSchedule（firebase-functions/v2/scheduler）で期限切れタスクを探し、担当者と人質に称号を付与

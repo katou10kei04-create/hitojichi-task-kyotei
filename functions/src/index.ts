@@ -13,4 +13,4 @@ setGlobalOptions({ region: 'asia-northeast1' })
 export const ping = onCall(() => ({ message: 'pong' }))
 
 // TODO(メンバー2): 称号判定
-// 例: onSchedule（firebase-functions/v2/scheduler）で期限切れタスクを探し、担当者と人質に称号を付与
+// 例: onSchedule（firebase-functions/v2/scheduler）で期限切れタスクを探し、本人に dis称号・チームの他メンバーに team dis称号を付与

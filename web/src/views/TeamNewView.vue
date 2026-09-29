@@ -3,25 +3,32 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createTeamInput } from '@hitojichi/shared'
 import { useTeams } from '@/composables/useTeams'
+import HostageTitleFields from '@/components/HostageTitleFields.vue'
 
 const router = useRouter()
 const { createTeam } = useTeams()
 
 const name = ref('')
+const selfDisTitleId = ref('')
+const teamDisTitleId = ref('')
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 
 async function submit() {
   errorMessage.value = ''
-  const parsed = createTeamInput.safeParse({ name: name.value })
+  const parsed = createTeamInput.safeParse({
+    name: name.value,
+    selfDisTitleId: selfDisTitleId.value,
+    teamDisTitleId: teamDisTitleId.value,
+  })
   if (!parsed.success) {
-    errorMessage.value = 'チーム名を1〜40文字で入力してください。'
+    errorMessage.value = 'チーム名（1〜40文字）と人質の称号2つを入力してください。'
     return
   }
 
   isSubmitting.value = true
   try {
-    const teamId = await createTeam(parsed.data.name)
+    const teamId = await createTeam(parsed.data)
     await router.push(`/teams/${teamId}`)
   } catch (error) {
     console.error(error)
@@ -46,6 +53,12 @@ async function submit() {
         class="rounded border px-3 py-2"
       />
     </label>
+
+    <p class="text-sm font-bold">人質（誰かがサボったときに付く称号）</p>
+    <HostageTitleFields
+      v-model:self-dis-title-id="selfDisTitleId"
+      v-model:team-dis-title-id="teamDisTitleId"
+    />
 
     <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
 

@@ -1,7 +1,7 @@
 import { addDoc, collection, query, where } from 'firebase/firestore'
 import { computed } from 'vue'
 import { useCollection, useCurrentUser, useFirestore } from 'vuefire'
-import { teamSchema, type Team } from '@hitojichi/shared'
+import { teamSchema, type CreateTeamInput, type Team } from '@hitojichi/shared'
 
 // 紛らわしい文字(0,O,1,I)を除いた招待コード用の文字セット
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -25,12 +25,12 @@ export function useTeams() {
   })
   const teams = useCollection<Team>(teamsQuery)
 
-  async function createTeam(name: string) {
+  async function createTeam(input: CreateTeamInput) {
     const uid = currentUser.value?.uid
     if (!uid) throw new Error('ログインが必要です')
 
     const team = teamSchema.parse({
-      name,
+      ...input,
       memberIds: [uid],
       inviteCode: generateInviteCode(),
       createdBy: uid,

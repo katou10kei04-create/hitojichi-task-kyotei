@@ -1,20 +1,35 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Timestamp } from 'firebase/firestore'
-import { Check, Plus } from 'lucide-vue-next'
-import { createTaskInput, taskStatusSchema, type Task } from '@hitojichi/shared'
+import { useCurrentUser } from 'vuefire'
+import { Check, Pencil, Plus } from 'lucide-vue-next'
+import {
+  createTaskInput,
+  taskStatusSchema,
+  updateTeamHostageInput,
+  type Task,
+} from '@hitojichi/shared'
 import { useTeamTasks } from '@/composables/useTeamTasks'
 import { useTeamMembers } from '@/composables/useTeamMembers'
+import { useTitles } from '@/composables/useTitles'
+import HostageTitleFields from '@/components/HostageTitleFields.vue'
 
 const props = defineProps<{ teamId: string }>()
 
-const { team, tasks, createTask, completeTask } = useTeamTasks(() => props.teamId)
+const currentUser = useCurrentUser()
+const { team, tasks, teamProgress, isCreator, createTask, completeTask, updateHostage } =
+  useTeamTasks(() => props.teamId)
 const memberIds = computed(() => team.value?.memberIds)
 const members = useTeamMembers(memberIds)
+const { titles } = useTitles()
 const isTasksPending = computed(() => tasks.pending.value)
 
 function memberName(uid: string) {
   return members.value.find((member) => member.id === uid)?.displayName ?? '(不明なメンバー)'
+}
+
+function titleName(titleId: string | undefined) {
+  return titles.value.find((title) => title.id === titleId)?.name ?? '(未設定)'
 }
 
 // FirestoreのTimestampがそのまま返ってくる場合があるため、表示前にDateへ揃える
@@ -29,9 +44,40 @@ const statusLabel: Record<(typeof taskStatusSchema)['options'][number], string> 
   overdue: '期限切れ',
 }
 
+// --- 人質（称号の組）の変更：作成者のみ ---
+const isEditingHostage = ref(false)
+const editSelfDisTitleId = ref('')
+const editTeamDisTitleId = ref('')
+const hostageErrorMessage = ref('')
+
+function startEditHostage() {
+  editSelfDisTitleId.value = team.value?.selfDisTitleId ?? ''
+  editTeamDisTitleId.value = team.value?.teamDisTitleId ?? ''
+  hostageErrorMessage.value = ''
+  isEditingHostage.value = true
+}
+
+async function saveHostage() {
+  hostageErrorMessage.value = ''
+  const parsed = updateTeamHostageInput.safeParse({
+    selfDisTitleId: editSelfDisTitleId.value,
+    teamDisTitleId: editTeamDisTitleId.value,
+  })
+  if (!parsed.success) {
+    hostageErrorMessage.value = '称号を2つとも選択してください。'
+    return
+  }
+  try {
+    await updateHostage(parsed.data)
+    isEditingHostage.value = false
+  } catch (error) {
+    console.error(error)
+    hostageErrorMessage.value = '人質の変更に失敗しました。もう一度お試しください。'
+  }
+}
+
+// --- 自分のタスクの追加 ---
 const title = ref('')
-const assigneeId = ref('')
-const hostageId = ref('')
 const dueAt = ref('')
 const errorMessage = ref('')
 const isSubmitting = ref(false)
@@ -40,12 +86,10 @@ async function submit() {
   errorMessage.value = ''
   const parsed = createTaskInput.safeParse({
     title: title.value,
-    assigneeId: assigneeId.value,
-    hostageId: hostageId.value,
     dueAt: dueAt.value ? new Date(dueAt.value) : undefined,
   })
   if (!parsed.success) {
-    errorMessage.value = 'タスク名・担当者・人質・期限をすべて入力してください。'
+    errorMessage.value = 'タスク名と期限を入力してください。'
     return
   }
 
@@ -53,8 +97,6 @@ async function submit() {
   try {
     await createTask(parsed.data)
     title.value = ''
-    assigneeId.value = ''
-    hostageId.value = ''
     dueAt.value = ''
   } catch (error) {
     console.error(error)
@@ -76,7 +118,49 @@ async function onComplete(task: Task & { id: string }) {
 <template>
   <h1 class="text-xl font-bold">タスク管理（{{ team?.name ?? '読み込み中…' }}）</h1>
 
+  <section class="mt-4 max-w-md rounded border p-4">
+    <p class="text-sm font-bold">チーム進捗度：{{ teamProgress }}%</p>
+    <div class="mt-2 h-3 overflow-hidden rounded bg-gray-200">
+      <div class="h-full bg-gray-700" :style="{ width: `${teamProgress}%` }" />
+    </div>
+  </section>
+
+  <section class="mt-4 flex max-w-md flex-col gap-3 rounded border p-4">
+    <div class="flex items-center justify-between">
+      <p class="text-sm font-bold">人質</p>
+      <button
+        v-if="isCreator && !isEditingHostage"
+        class="flex items-center gap-1 rounded border px-3 py-1 text-sm"
+        @click="startEditHostage"
+      >
+        <Pencil :size="14" />
+        変更
+      </button>
+    </div>
+
+    <template v-if="isEditingHostage">
+      <HostageTitleFields
+        v-model:self-dis-title-id="editSelfDisTitleId"
+        v-model:team-dis-title-id="editTeamDisTitleId"
+      />
+      <p v-if="hostageErrorMessage" class="text-sm text-red-600">{{ hostageErrorMessage }}</p>
+      <div class="flex gap-2">
+        <button class="rounded border px-3 py-1.5 text-sm font-bold" @click="saveHostage">
+          保存
+        </button>
+        <button class="rounded border px-3 py-1.5 text-sm" @click="isEditingHostage = false">
+          キャンセル
+        </button>
+      </div>
+    </template>
+    <template v-else>
+      <p class="text-sm">dis称号（サボった本人）：{{ titleName(team?.selfDisTitleId) }}</p>
+      <p class="text-sm">team dis称号（仲間）：{{ titleName(team?.teamDisTitleId) }}</p>
+    </template>
+  </section>
+
   <form class="mt-4 flex max-w-md flex-col gap-3 rounded border p-4" @submit.prevent="submit">
+    <p class="text-sm font-bold">自分のタスクを追加</p>
     <label class="flex flex-col gap-1 text-sm">
       タスク名
       <input
@@ -86,24 +170,6 @@ async function onComplete(task: Task & { id: string }) {
         placeholder="例：企画書を書く"
         class="rounded border px-3 py-2"
       />
-    </label>
-    <label class="flex flex-col gap-1 text-sm">
-      担当者
-      <select v-model="assigneeId" class="rounded border px-3 py-2">
-        <option value="" disabled>選択してください</option>
-        <option v-for="member in members" :key="member.id" :value="member.id">
-          {{ member.displayName }}
-        </option>
-      </select>
-    </label>
-    <label class="flex flex-col gap-1 text-sm">
-      人質（サボったら巻き添えになる相手）
-      <select v-model="hostageId" class="rounded border px-3 py-2">
-        <option value="" disabled>選択してください</option>
-        <option v-for="member in members" :key="member.id" :value="member.id">
-          {{ member.displayName }}
-        </option>
-      </select>
     </label>
     <label class="flex flex-col gap-1 text-sm">
       期限
@@ -133,14 +199,13 @@ async function onComplete(task: Task & { id: string }) {
     >
       <div class="flex-1">
         <p class="font-bold">{{ task.title }}</p>
-        <p class="text-xs text-gray-500">
-          担当: {{ memberName(task.assigneeId) }} ／ 人質: {{ memberName(task.hostageId) }}
-        </p>
+        <p class="text-xs text-gray-500">{{ memberName(task.ownerId) }} のタスク</p>
         <p class="text-xs text-gray-500">期限: {{ formatDueAt(task.dueAt) }}</p>
       </div>
       <span class="text-xs font-bold">{{ statusLabel[task.status] }}</span>
+      <!-- 完了にできるのは本人のタスクだけ（Firestoreルールでも制限） -->
       <button
-        v-if="task.status === 'todo'"
+        v-if="task.status === 'todo' && task.ownerId === currentUser?.uid"
         class="flex items-center gap-1 rounded border px-3 py-1.5 text-sm"
         @click="onComplete(task)"
       >

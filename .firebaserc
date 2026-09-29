@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-hitojichi"
+    "default": "demo-hitojichi",
+    "prod": "hitojichi-task-kyotei"
   }
 }

@@ -20,9 +20,20 @@ npm run emulators   # Firebase Emulator（Auth / Firestore / Functions）
 npm run dev         # 画面 http://localhost:5173
 ```
 
-Emulatorの管理画面は http://localhost:4000 です。データはリポジトリ直下の `emulator-data/` に保存されます（Git管理外）。
+Emulatorの管理画面は http://localhost:4000 です。
 
-Functionsを書き換えたら、別ターミナルで `npm run build:watch -w functions` を動かしておくとEmulatorに自動反映されます。
+### Emulatorのデータ
+
+| フォルダ | 役割 | Git |
+|---|---|---|
+| `seed/` | チーム共有の初期データ（ダミーユーザー・称号マスタなど） | コミットする |
+| `emulator-data/` | 各自の作業データ | 管理外 |
+
+- `npm run emulators`：毎回 `seed/` の状態から起動し、終了時に `emulator-data/` へ保存します
+- `npm run emulators:resume`：前回の `emulator-data/` から続きで起動します
+- `npm run emulators:seed`：共有の初期データを編集したいときに使います。Emulator UI で編集して Ctrl+C で終了すると `seed/` に保存されるので、コミットして共有してください
+
+Functionsを書き換えたら、別ターミナルで `npm run fn:watch` を動かしておくとEmulatorに自動反映されます。
 
 ## フォルダ構成
 

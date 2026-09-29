@@ -4,7 +4,10 @@
   "workspaces": ["web", "functions", "shared"],
   "scripts": {
     "dev": "npm run dev -w web",
-    "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit",
+    "emulators": "firebase emulators:start --project demo-hitojichi --import=./seed --export-on-exit=./emulator-data",
+    "emulators:resume": "firebase emulators:start --project demo-hitojichi --import=./emulator-data --export-on-exit=./emulator-data",
+    "emulators:seed": "firebase emulators:start --project demo-hitojichi --import=./seed --export-on-exit=./seed",
+    "fn:watch": "npm run build:watch -w functions",
     "build": "npm run build -w web && npm run build -w functions",
     "lint": "npm run lint -w web",
     "format": "prettier --write \"web/src/**/*.{ts,vue}\" \"functions/src/**/*.ts\" \"shared/**/*.ts\"",

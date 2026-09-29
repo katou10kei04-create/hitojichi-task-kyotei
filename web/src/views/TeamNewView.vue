@@ -9,6 +9,7 @@ const router = useRouter()
 const { createTeam } = useTeams()
 
 const name = ref('')
+const description = ref('')
 const selfDisTitleId = ref('')
 const teamDisTitleId = ref('')
 const isSubmitting = ref(false)
@@ -18,11 +19,13 @@ async function submit() {
   errorMessage.value = ''
   const parsed = createTeamInput.safeParse({
     name: name.value,
+    description: description.value,
     selfDisTitleId: selfDisTitleId.value,
     teamDisTitleId: teamDisTitleId.value,
   })
   if (!parsed.success) {
-    errorMessage.value = 'チーム名（1〜40文字）と人質の称号2つを入力してください。'
+    errorMessage.value =
+      'チーム名（1〜40文字）、説明（120文字以内）、人質の称号2つを確認してください。'
     return
   }
 
@@ -52,6 +55,18 @@ async function submit() {
         placeholder="例：もくもく開発班"
         class="rounded border px-3 py-2"
       />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      チーム説明（任意）
+      <textarea
+        v-model="description"
+        maxlength="120"
+        rows="3"
+        placeholder="例：毎週の目標を共有し、一緒に開発を進めるチームです"
+        class="resize-y rounded border px-3 py-2"
+      />
+      <span class="text-xs text-gray-500">{{ description.length }}/120文字</span>
     </label>
 
     <p class="text-sm font-bold">人質（誰かがサボったときに付く称号）</p>

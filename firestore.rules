@@ -23,26 +23,30 @@ service cloud.firestore {
     }
 
     // チーム：メンバーのみ閲覧・更新可
-    // TODO: 招待コードでの参加方法（Functions経由にするか）を決める
+    // 招待コードでの参加・memberIdsの追加はCallable経由のみ。
     match /teams/{teamId} {
       // teams自身の読み取り/更新は、自己参照get()を避けてresource.dataを直接見る
       // （isMember()の自己get()は一覧取得(list)クエリの評価時にNull value errorになるため使わない）
       allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
       // 作成者は変更不可。人質（dis称号・team dis称号）を変更できるのは作成者のみ
       allow update: if signedIn() && request.auth.uid in resource.data.memberIds
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy'])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy', 'memberIds'])
         && (request.auth.uid == resource.data.createdBy
           || !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['selfDisTitleId', 'teamDisTitleId']));
-      allow create: if signedIn() && request.auth.uid in request.resource.data.memberIds
+      allow create: if signedIn() && request.resource.data.memberIds == [request.auth.uid]
         && request.resource.data.createdBy == request.auth.uid;
 
       // タスク：閲覧はチームメンバー全員、追加・更新・削除は本人（ownerId）のみ
       match /tasks/{taskId} {
         allow read: if isMember(teamId);
-        allow create: if isMember(teamId) && request.resource.data.ownerId == request.auth.uid;
+        allow create: if isMember(teamId) && request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.status == 'todo';
         allow update: if isMember(teamId) && resource.data.ownerId == request.auth.uid
-          && request.resource.data.ownerId == request.auth.uid;
+          && request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'dueAt', 'status'])
+          && (request.resource.data.status == resource.data.status
+            || (resource.data.status == 'todo' && request.resource.data.status == 'done'));
         allow delete: if isMember(teamId) && resource.data.ownerId == request.auth.uid;
       }
     }

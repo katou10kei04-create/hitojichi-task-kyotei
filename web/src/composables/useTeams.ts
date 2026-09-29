@@ -1,5 +1,8 @@
 import { addDoc, collection, query, where } from 'firebase/firestore'
 import { computed } from 'vue'
+import { httpsCallable } from 'firebase/functions'
+import { functions } from '@/lib/firebase'
+import { joinTeamInput, type JoinTeamInput, type JoinTeamResult } from '@hitojichi/shared'
 import { useCollection, useCurrentUser, useFirestore } from 'vuefire'
 import { teamSchema, type CreateTeamInput, type Team } from '@hitojichi/shared'
 
@@ -39,5 +42,14 @@ export function useTeams() {
     return ref.id
   }
 
-  return { teams, createTeam }
+  async function joinTeam(input: JoinTeamInput) {
+    const parsed = joinTeamInput.parse(input)
+    const result = await httpsCallable<JoinTeamInput, JoinTeamResult>(
+      functions,
+      'joinTeamByInviteCode',
+    )(parsed)
+    return result.data.teamId
+  }
+
+  return { teams, createTeam, joinTeam }
 }

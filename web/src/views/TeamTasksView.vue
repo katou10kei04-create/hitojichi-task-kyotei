@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Timestamp } from 'firebase/firestore'
 import { useCurrentUser } from 'vuefire'
-import { Check, Pencil, Plus } from 'lucide-vue-next'
+import { Check, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import {
   createTaskInput,
+  updateTaskInput,
   taskStatusSchema,
   updateTeamHostageInput,
   type Task,
@@ -17,8 +18,17 @@ import HostageTitleFields from '@/components/HostageTitleFields.vue'
 const props = defineProps<{ teamId: string }>()
 
 const currentUser = useCurrentUser()
-const { team, tasks, teamProgress, isCreator, createTask, completeTask, updateHostage } =
-  useTeamTasks(() => props.teamId)
+const {
+  team,
+  tasks,
+  teamProgress,
+  isCreator,
+  createTask,
+  completeTask,
+  updateTask,
+  deleteTask,
+  updateHostage,
+} = useTeamTasks(() => props.teamId)
 const memberIds = computed(() => team.value?.memberIds)
 const members = useTeamMembers(memberIds)
 const { titles } = useTitles()
@@ -106,17 +116,94 @@ async function submit() {
   }
 }
 
+const editingTaskId = ref<string | null>(null)
+const editTitle = ref('')
+const editDueAt = ref('')
+const busyTaskId = ref<string | null>(null)
+const taskErrorMessage = ref('')
+
+watch(
+  () => props.teamId,
+  () => {
+    editingTaskId.value = null
+    taskErrorMessage.value = ''
+  },
+)
+
+function startEditTask(task: Task & { id: string }) {
+  const date = task.dueAt instanceof Timestamp ? task.dueAt.toDate() : task.dueAt
+  // datetime-localにはUTCではなくローカル時刻を渡す。
+  const pad = (value: number) => String(value).padStart(2, '0')
+  editDueAt.value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${String(date.getMilliseconds()).padStart(3, '0')}`
+  editTitle.value = task.title
+  editingTaskId.value = task.id
+  taskErrorMessage.value = ''
+}
+
+async function saveTask(taskId: string) {
+  if (busyTaskId.value) return
+  taskErrorMessage.value = ''
+  const parsed = updateTaskInput.safeParse({
+    title: editTitle.value,
+    dueAt: editDueAt.value ? new Date(editDueAt.value) : undefined,
+  })
+  if (!parsed.success) {
+    taskErrorMessage.value = 'タスク名（1〜100文字）と有効な期限を入力してください。'
+    return
+  }
+  busyTaskId.value = taskId
+  try {
+    await updateTask(taskId, parsed.data)
+    editingTaskId.value = null
+  } catch (error) {
+    console.error(error)
+    taskErrorMessage.value = 'タスクの編集に失敗しました。もう一度お試しください。'
+  } finally {
+    busyTaskId.value = null
+  }
+}
+
+async function onDelete(task: Task & { id: string }) {
+  if (busyTaskId.value || !window.confirm(`「${task.title}」を削除しますか？`)) return
+  taskErrorMessage.value = ''
+  busyTaskId.value = task.id
+  try {
+    await deleteTask(task.id)
+    if (editingTaskId.value === task.id) editingTaskId.value = null
+  } catch (error) {
+    console.error(error)
+    taskErrorMessage.value = 'タスクの削除に失敗しました。もう一度お試しください。'
+  } finally {
+    busyTaskId.value = null
+  }
+}
+
 async function onComplete(task: Task & { id: string }) {
+  if (busyTaskId.value) return
+  taskErrorMessage.value = ''
+  busyTaskId.value = task.id
   try {
     await completeTask(task.id)
   } catch (error) {
     console.error(error)
+    taskErrorMessage.value = '完了にできませんでした。タスクの状態を確認してください。'
+  } finally {
+    busyTaskId.value = null
   }
 }
 </script>
 
 <template>
   <h1 class="text-xl font-bold">タスク管理（{{ team?.name ?? '読み込み中…' }}）</h1>
+
+  <section class="mt-4 max-w-md rounded border p-4">
+    <h2 class="text-sm font-bold">メンバー</h2>
+    <ul class="mt-2 flex flex-col gap-1 text-sm">
+      <li v-for="uid in team?.memberIds ?? []" :key="uid">
+        {{ memberName(uid) }}<span v-if="uid === currentUser?.uid">（自分）</span>
+      </li>
+    </ul>
+  </section>
 
   <section class="mt-4 max-w-md rounded border p-4">
     <p class="text-sm font-bold">チーム進捗度：{{ teamProgress }}%</p>
@@ -188,6 +275,9 @@ async function onComplete(task: Task & { id: string }) {
     </button>
   </form>
 
+  <p v-if="taskErrorMessage" role="alert" class="mt-4 text-sm text-red-600">
+    {{ taskErrorMessage }}
+  </p>
   <p v-if="isTasksPending" class="mt-6 text-sm text-gray-500">読み込み中…</p>
   <p v-else-if="tasks.length === 0" class="mt-6 text-sm text-gray-500">タスクはまだありません。</p>
 
@@ -197,17 +287,79 @@ async function onComplete(task: Task & { id: string }) {
       :key="task.id"
       class="flex items-center gap-3 rounded border px-4 py-3"
     >
-      <div class="flex-1">
+      <form
+        v-if="editingTaskId === task.id && task.ownerId === currentUser?.uid"
+        class="flex flex-1 flex-col gap-3"
+        @submit.prevent="saveTask(task.id)"
+      >
+        <label class="flex flex-col gap-1 text-sm">
+          タスク名
+          <input
+            v-model="editTitle"
+            type="text"
+            maxlength="100"
+            required
+            class="rounded border px-3 py-2"
+            :disabled="!!busyTaskId"
+          />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          期限
+          <input
+            v-model="editDueAt"
+            type="datetime-local"
+            step="0.001"
+            required
+            class="rounded border px-3 py-2"
+            :disabled="!!busyTaskId"
+          />
+        </label>
+        <div class="flex gap-2">
+          <button
+            type="submit"
+            class="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+            :disabled="!!busyTaskId"
+          >
+            保存
+          </button>
+          <button
+            type="button"
+            class="rounded border px-3 py-1.5 text-sm"
+            :disabled="!!busyTaskId"
+            @click="editingTaskId = null"
+          >
+            キャンセル
+          </button>
+        </div>
+      </form>
+      <div v-else class="flex-1">
         <p class="font-bold">{{ task.title }}</p>
         <p class="text-xs text-gray-500">{{ memberName(task.ownerId) }} のタスク</p>
         <p class="text-xs text-gray-500">期限: {{ formatDueAt(task.dueAt) }}</p>
       </div>
       <span class="text-xs font-bold">{{ statusLabel[task.status] }}</span>
+      <template v-if="task.ownerId === currentUser?.uid && editingTaskId !== task.id">
+        <button
+          class="flex items-center gap-1 rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+          :disabled="!!busyTaskId"
+          @click="startEditTask(task)"
+        >
+          <Pencil :size="16" />編集
+        </button>
+        <button
+          class="flex items-center gap-1 rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+          :disabled="!!busyTaskId"
+          @click="onDelete(task)"
+        >
+          <Trash2 :size="16" />削除
+        </button>
+      </template>
       <!-- 完了にできるのは本人のタスクだけ（Firestoreルールでも制限） -->
       <button
         v-if="task.status === 'todo' && task.ownerId === currentUser?.uid"
         class="flex items-center gap-1 rounded border px-3 py-1.5 text-sm"
         @click="onComplete(task)"
+        :disabled="!!busyTaskId"
       >
         <Check :size="16" />
         完了

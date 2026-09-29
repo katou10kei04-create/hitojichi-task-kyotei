@@ -1,11 +1,19 @@
 import { addDoc, collection, doc, updateDoc, type CollectionReference } from 'firebase/firestore'
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
-import { useCollection, useDocument, useFirestore } from 'vuefire'
-import { taskSchema, type Task, type Team } from '@hitojichi/shared'
+import { useCollection, useCurrentUser, useDocument, useFirestore } from 'vuefire'
+import {
+  taskSchema,
+  updateTeamHostageInput,
+  type CreateTaskInput,
+  type Task,
+  type Team,
+  type UpdateTeamHostageInput,
+} from '@hitojichi/shared'
 
-/** チーム詳細（メンバー等）とチーム内タスクの取得・作成・状態更新をまとめたcomposable */
+/** チーム詳細（メンバー・人質）とチーム内タスクの取得・作成・状態更新をまとめたcomposable */
 export function useTeamTasks(teamId: MaybeRefOrGetter<string>) {
   const db = useFirestore()
+  const currentUser = useCurrentUser()
 
   const teamRef = computed(() => doc(db, 'teams', toValue(teamId)))
   const team = useDocument<Team>(teamRef)
@@ -15,13 +23,25 @@ export function useTeamTasks(teamId: MaybeRefOrGetter<string>) {
   )
   const tasks = useCollection<Task>(tasksRef)
 
-  async function createTask(input: {
-    title: string
-    assigneeId: string
-    hostageId: string
-    dueAt: Date
-  }) {
-    const task = taskSchema.parse({ ...input, status: 'todo' })
+  // チーム進捗度：メンバー全員のタスクを合算した完了率（0〜100、タスクが無ければ0）
+  const teamProgress = computed(() => {
+    const total = tasks.value.length
+    if (total === 0) return 0
+    const done = tasks.value.filter((task) => task.status === 'done').length
+    return Math.round((done / total) * 100)
+  })
+
+  // 人質（称号の組）を変更できるのはチーム作成者だけ
+  const isCreator = computed(
+    () => !!currentUser.value && team.value?.createdBy === currentUser.value.uid,
+  )
+
+  /** 自分のタスクとして追加する（タスクは個人が自分で管理するもの） */
+  async function createTask(input: CreateTaskInput) {
+    const uid = currentUser.value?.uid
+    if (!uid) throw new Error('ログインが必要です')
+
+    const task = taskSchema.parse({ ...input, ownerId: uid, status: 'todo' })
     await addDoc(collection(db, 'teams', toValue(teamId), 'tasks'), task)
   }
 
@@ -31,5 +51,10 @@ export function useTeamTasks(teamId: MaybeRefOrGetter<string>) {
     })
   }
 
-  return { team, tasks, createTask, completeTask }
+  async function updateHostage(input: UpdateTeamHostageInput) {
+    const hostage = updateTeamHostageInput.parse(input)
+    await updateDoc(doc(db, 'teams', toValue(teamId)), hostage)
+  }
+
+  return { team, tasks, teamProgress, isCreator, createTask, completeTask, updateHostage }
 }

@@ -18,15 +18,17 @@ export const teamSchema = z.object({
   memberIds: z.array(z.string()).min(1),
   inviteCode: z.string(),
   createdBy: z.string(),
+  // 人質：チーム作成時に作成者が選ぶ称号の組（変更も作成者のみ）
+  selfDisTitleId: z.string().min(1), // サボった本人に付与するdis称号
+  teamDisTitleId: z.string().min(1), // サボった人の仲間に付与するteam dis称号
 })
 export type Team = z.infer<typeof teamSchema>
 
-/** teams/{teamId}/tasks/{taskId} */
+/** teams/{teamId}/tasks/{taskId}（各メンバーが自分で追加・管理する個人タスク） */
 export const taskStatusSchema = z.enum(['todo', 'done', 'overdue'])
 export const taskSchema = z.object({
   title: z.string().min(1).max(100),
-  assigneeId: z.string().min(1),
-  hostageId: z.string().min(1), // 人質になる仲間
+  ownerId: z.string().min(1), // タスクを追加した本人
   dueAt: z.date(),
   status: taskStatusSchema,
 })
@@ -42,10 +44,16 @@ export type Title = z.infer<typeof titleSchema>
 
 /** フォーム入力用 */
 export const updateUserProfileInput = userSchema.pick({ displayName: true })
-export const createTeamInput = teamSchema.pick({ name: true })
-export const createTaskInput = taskSchema.pick({
-  title: true,
-  assigneeId: true,
-  hostageId: true,
-  dueAt: true,
+export const createTeamInput = teamSchema.pick({
+  name: true,
+  selfDisTitleId: true,
+  teamDisTitleId: true,
 })
+export type CreateTeamInput = z.infer<typeof createTeamInput>
+export const updateTeamHostageInput = teamSchema.pick({
+  selfDisTitleId: true,
+  teamDisTitleId: true,
+})
+export type UpdateTeamHostageInput = z.infer<typeof updateTeamHostageInput>
+export const createTaskInput = taskSchema.pick({ title: true, dueAt: true })
+export type CreateTaskInput = z.infer<typeof createTaskInput>

@@ -41,7 +41,10 @@ npm workspaces 構成（`web` / `functions` / `shared`）。基本はリポジ�
 ```bash
 npm install               # 依存関係のインストール（ルートで一括）
 npm run dev                # web の開発サーバー起動
-npm run emulators           # Firebase エミュレータ起動（emulator-data を import/export）
+npm run emulators           # Firebase エミュレータ起動（共有の seed/ から起動し、終了時に個人用 emulator-data/ へ保存）
+npm run emulators:resume    # 前回の個人データ（emulator-data/）から再開する
+npm run emulators:seed      # 共有の初期データ（seed/）を編集する。終了時に seed/ へ保存されるのでコミットして共有
+npm run fn:watch            # functions を監視ビルド（エミュレータと並行して別ターミナルで起動）
 npm run build               # web + functions のビルド
 npm run lint                # web の Lint（oxlint + eslint）
 npm run format               # prettier で web/functions/shared を一括フォーマット

@@ -1,6 +1,6 @@
 /**
  * フロントエンドとCloud Functionsで共通の型・入力検証。
- * ⚠ 叩き台です。1日目の全員ミーティングで確定させてください。
+ * 変更するときは、先にチーム全員に声をかけること（フロントとFunctionsの両方に影響する）。
  */
 import { z } from 'zod'
 
@@ -40,7 +40,6 @@ export type Task = z.infer<typeof taskSchema>
 export const titleSchema = z.object({
   name: z.string(),
   description: z.string(),
-  shameLevel: z.number().int().min(0).max(5), // 不名誉度
 })
 export type Title = z.infer<typeof titleSchema>
 
@@ -64,4 +63,4 @@ export const updateTaskInput = taskSchema.pick({ title: true, dueAt: true })
 export type UpdateTaskInput = z.infer<typeof updateTaskInput>
 export const joinTeamInput = z.object({ inviteCode: z.string().trim().min(1).max(128) })
 export type JoinTeamInput = z.infer<typeof joinTeamInput>
-export type JoinTeamResult = { teamId: string }
+export type JoinTeamResult = { teamId: string; teamName: string } // 参加後の画面でチーム名を表示する

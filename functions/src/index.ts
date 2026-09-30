@@ -35,10 +35,11 @@ export const joinTeamByInviteCode = onCall(async (request): Promise<JoinTeamResu
         '招待コードが重複しています。作成者に確認してください',
       )
     transaction.update(team.ref, { memberIds: FieldValue.arrayUnion(uid) })
-    return { teamId: team.id }
+    return { teamId: team.id, teamName: team.get('name') }
   })
 })
 
+// TODO(key): エミュレータでは onSchedule が自動で動かないため、デモ・動作確認用に同じ処理を呼べる onCall があると便利
 export const checkOverdueTasks = onSchedule('every 1 minutes', async () => {
   await processOverdueTasks(getFirestore(), Timestamp.now())
 })

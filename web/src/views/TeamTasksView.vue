@@ -194,6 +194,7 @@ async function onComplete(task: Task & { id: string }) {
 </script>
 
 <template>
+  <!-- TODO(saya): 称号が付いたとき・格上げされたときの演出 -->
   <h1 class="text-xl font-bold">タスク管理（{{ team?.name ?? '読み込み中…' }}）</h1>
 
   <section class="mt-4 max-w-md rounded border p-4">

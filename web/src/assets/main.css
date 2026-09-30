@@ -1,4 +1,24 @@
 @import 'tailwindcss';
 
-/* デザイントークンはここに追加（@theme） */
-/* TODO(saya): AGENTS.md のカラーパレットとゴシック調の見出しフォントを登録する */
+/* デザイントークン。色は bg-primary / text-ink / border-muted のようにクラス名で使う */
+@theme {
+  /* カラーパレット（AGENTS.md）。メインの #F8F7F7 は text-base（文字サイズ）と名前が衝突するため canvas にしている */
+  --color-canvas: #f8f7f7;
+  --color-primary: #7f60cb;
+  --color-ink: #242035;
+  --color-muted: #c7c6d9;
+  --color-accent: #f2d516;
+
+  /* フォント（index.html で Google Fonts から読み込む） */
+  --font-sans: 'M PLUS Rounded 1c', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Dela Gothic One', 'M PLUS Rounded 1c', sans-serif; /* 見出し用の極太ゴシック */
+  --font-dot: 'DotGothic16', ui-monospace, monospace; /* 「YOUR TEAMS」などのドット文字 */
+
+  /* ゲームっぽいベタ影（ぼかさずに下へずらす）。 */
+  --shadow: 0 5px 0 0 var(--color-ink);
+  --shadow-sm: 0 3px 0 0 var(--color-ink);
+}
+
+body {
+  @apply bg-canvas font-sans text-ink;
+}

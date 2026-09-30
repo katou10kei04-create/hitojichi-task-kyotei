@@ -1,18 +1,27 @@
-import { addDoc, collection, doc, updateDoc, type CollectionReference } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  doc,
+  runTransaction,
+  updateDoc,
+  type CollectionReference,
+} from 'firebase/firestore'
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
-import { useCollection, useCurrentUser, useDocument, useFirestore } from 'vuefire'
+import { useCollection, useCurrentUser, useDocument } from 'vuefire'
+import { db } from '@/lib/firebase'
 import {
   taskSchema,
+  updateTaskInput,
   updateTeamHostageInput,
   type CreateTaskInput,
   type Task,
+  type UpdateTaskInput,
   type Team,
   type UpdateTeamHostageInput,
 } from '@hitojichi/shared'
 
 /** チーム詳細（メンバー・人質）とチーム内タスクの取得・作成・状態更新をまとめたcomposable */
 export function useTeamTasks(teamId: MaybeRefOrGetter<string>) {
-  const db = useFirestore()
   const currentUser = useCurrentUser()
 
   const teamRef = computed(() => doc(db, 'teams', toValue(teamId)))
@@ -51,10 +60,46 @@ export function useTeamTasks(teamId: MaybeRefOrGetter<string>) {
     })
   }
 
+  /** 最新の所有者を確認し、編集では状態を上書きしない。 */
+  async function updateTask(taskId: string, input: UpdateTaskInput) {
+    const uid = currentUser.value?.uid
+    if (!uid) throw new Error('ログインが必要です')
+    const changes = updateTaskInput.parse(input)
+    const taskRef = doc(db, 'teams', toValue(teamId), 'tasks', taskId)
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(taskRef)
+      if (!snapshot.exists()) throw new Error('タスクが見つかりません')
+      if (snapshot.data().ownerId !== uid) throw new Error('自分のタスクのみ編集できます')
+      transaction.update(taskRef, changes)
+    })
+  }
+
+  async function deleteTask(taskId: string) {
+    const uid = currentUser.value?.uid
+    if (!uid) throw new Error('ログインが必要です')
+    const taskRef = doc(db, 'teams', toValue(teamId), 'tasks', taskId)
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(taskRef)
+      if (!snapshot.exists()) throw new Error('タスクが見つかりません')
+      if (snapshot.data().ownerId !== uid) throw new Error('自分のタスクのみ削除できます')
+      transaction.delete(taskRef)
+    })
+  }
+
   async function updateHostage(input: UpdateTeamHostageInput) {
     const hostage = updateTeamHostageInput.parse(input)
     await updateDoc(doc(db, 'teams', toValue(teamId)), hostage)
   }
 
-  return { team, tasks, teamProgress, isCreator, createTask, completeTask, updateHostage }
+  return {
+    team,
+    tasks,
+    teamProgress,
+    isCreator,
+    createTask,
+    completeTask,
+    updateTask,
+    deleteTask,
+    updateHostage,
+  }
 }

@@ -9,12 +9,14 @@ export const userSchema = z.object({
   displayName: z.string().min(1).max(30),
   photoURL: z.string().url().nullable(),
   titleIds: z.array(z.string()), // 獲得した称号（Functionsのみ書き込み可）
+  equippedTitleId: z.string().min(1).nullable().optional(), // 装備中の称号マスタID。既存ユーザーは未設定
 })
 export type User = z.infer<typeof userSchema>
 
 /** teams/{teamId} */
 export const teamSchema = z.object({
   name: z.string().min(1).max(40),
+  description: z.string().max(120).optional(), // 説明なしの既存チームも有効
   memberIds: z.array(z.string()).min(1),
   inviteCode: z.string(),
   createdBy: z.string(),
@@ -46,6 +48,7 @@ export type Title = z.infer<typeof titleSchema>
 export const updateUserProfileInput = userSchema.pick({ displayName: true })
 export const createTeamInput = teamSchema.pick({
   name: true,
+  description: true,
   selfDisTitleId: true,
   teamDisTitleId: true,
 })
@@ -57,3 +60,8 @@ export const updateTeamHostageInput = teamSchema.pick({
 export type UpdateTeamHostageInput = z.infer<typeof updateTeamHostageInput>
 export const createTaskInput = taskSchema.pick({ title: true, dueAt: true })
 export type CreateTaskInput = z.infer<typeof createTaskInput>
+export const updateTaskInput = taskSchema.pick({ title: true, dueAt: true })
+export type UpdateTaskInput = z.infer<typeof updateTaskInput>
+export const joinTeamInput = z.object({ inviteCode: z.string().trim().min(1).max(128) })
+export type JoinTeamInput = z.infer<typeof joinTeamInput>
+export type JoinTeamResult = { teamId: string }

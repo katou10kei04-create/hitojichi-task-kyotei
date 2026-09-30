@@ -40,7 +40,6 @@ export type Task = z.infer<typeof taskSchema>
 export const titleSchema = z.object({
   name: z.string(),
   description: z.string(),
-  shameLevel: z.number().int().min(0).max(5), // 不名誉度
 })
 export type Title = z.infer<typeof titleSchema>
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Lock, Skull } from 'lucide-vue-next'
+import { Lock } from 'lucide-vue-next'
 import { useTitles } from '@/composables/useTitles'
 import { useCurrentUserProfile } from '@/composables/useCurrentUserProfile'
 
@@ -14,8 +14,6 @@ const ownedTitleIds = computed(() => new Set(profile.value?.titleIds ?? []))
 function isOwned(titleId: string) {
   return ownedTitleIds.value.has(titleId)
 }
-
-const sortedTitles = computed(() => [...titles.value].sort((a, b) => b.shameLevel - a.shameLevel))
 </script>
 
 <template>
@@ -23,13 +21,13 @@ const sortedTitles = computed(() => [...titles.value].sort((a, b) => b.shameLeve
 
   <p v-if="isPending" class="mt-4 text-sm text-gray-500">読み込み中…</p>
   <p v-else-if="loadError" class="mt-4 text-sm text-red-600">称号一覧の取得に失敗しました。</p>
-  <p v-else-if="sortedTitles.length === 0" class="mt-4 text-sm text-gray-500">
+  <p v-else-if="titles.length === 0" class="mt-4 text-sm text-gray-500">
     まだ称号が登録されていません。
   </p>
 
   <ul v-else class="mt-4 flex flex-col gap-2">
     <li
-      v-for="title in sortedTitles"
+      v-for="title in titles"
       :key="title.id"
       class="flex items-center gap-3 rounded border px-4 py-3"
       :class="isOwned(title.id) ? '' : 'opacity-50'"
@@ -43,14 +41,6 @@ const sortedTitles = computed(() => [...titles.value].sort((a, b) => b.shameLeve
           <Lock v-else :size="14" class="text-gray-400" />
         </div>
         <p class="text-xs text-gray-500">{{ title.description }}</p>
-      </div>
-      <div class="flex items-center gap-0.5" :title="`不名誉度 ${title.shameLevel}`">
-        <Skull
-          v-for="i in title.shameLevel"
-          :key="i"
-          :size="14"
-          class="text-gray-500"
-        />
       </div>
     </li>
   </ul>

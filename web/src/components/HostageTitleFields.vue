@@ -2,6 +2,7 @@
 import { computed, ref, useId } from 'vue'
 import { Check, ChevronRight, Shield, Skull, Trophy, X } from 'lucide-vue-next'
 import { useTitles } from '@/composables/useTitles'
+import IconTile from '@/components/IconTile.vue'
 
 const selfDisTitleId = defineModel<string>('selfDisTitleId', { required: true })
 const teamDisTitleId = defineModel<string>('teamDisTitleId', { required: true })
@@ -51,17 +52,12 @@ function selectTitle(id: string) {
     type="button"
     aria-haspopup="dialog"
     :aria-label="`${field.label}を選択、現在：${field.title?.name ?? '未選択'}`"
-    class="group w-full rounded-2xl border-2 border-muted bg-canvas p-4 text-left transition hover:-translate-y-0.5 hover:border-primary hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+    class="group w-full rounded-2xl border-[3px] border-ink bg-canvas p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
     @click="openPicker(field.key)"
   >
     <span class="flex items-center gap-3">
-      <span
-        class="grid size-11 shrink-0 place-items-center rounded-xl"
-        :class="field.key === 'self' ? 'bg-primary/15 text-primary' : 'bg-accent/30 text-ink'"
-        aria-hidden="true"
-      >
-        <component :is="field.icon" :size="23" :stroke-width="2.5" />
-      </span>
+      <!-- 見出しと同じ部品を使い、称号の種類が違っても縁取りと影を統一する。 -->
+      <IconTile :icon="field.icon" :tone="field.key === 'self' ? 'primary' : 'accent'" />
       <span class="min-w-0 flex-1">
         <span class="block text-sm font-extrabold">{{ field.label }}</span>
         <span class="mt-0.5 block text-xs text-ink/60">{{ field.recipient }}</span>
@@ -106,7 +102,7 @@ function selectTitle(id: string) {
           <button
             type="button"
             aria-label="称号選択を閉じる"
-            class="grid size-10 shrink-0 place-items-center rounded-full border-2 border-muted bg-white transition hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
+            class="grid size-10 shrink-0 place-items-center rounded-full border-[3px] border-ink bg-white transition hover:bg-muted/30 focus-visible:outline-2 focus-visible:outline-primary"
             @click="dialog?.close()"
           >
             <X :size="20" aria-hidden="true" />
@@ -126,14 +122,14 @@ function selectTitle(id: string) {
             :key="title.id"
             type="button"
             :aria-pressed="selectedId === title.id"
-            class="rounded-2xl border-2 p-4 text-left transition hover:-translate-y-0.5 hover:border-primary hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            class="rounded-2xl border-[3px] p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             :class="
-              selectedId === title.id ? 'border-primary bg-primary/10' : 'border-muted bg-white'
+              selectedId === title.id ? 'border-primary bg-primary/10' : 'border-ink bg-white'
             "
             @click="selectTitle(title.id)"
           >
             <span class="flex items-center justify-between gap-2">
-              <Trophy :size="22" class="text-primary" aria-hidden="true" />
+              <IconTile :icon="Trophy" tone="muted" />
               <span
                 v-if="selectedId === title.id"
                 class="flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-xs font-bold text-white"

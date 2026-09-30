@@ -4,7 +4,7 @@ import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/lib/firebase'
 import { joinTeamInput, type JoinTeamInput, type JoinTeamResult } from '@hitojichi/shared'
 import { useCollection, useCurrentUser, useFirestore } from 'vuefire'
-import { teamSchema, type CreateTeamInput, type Team } from '@hitojichi/shared'
+import { createTeamInput, teamSchema, type CreateTeamInput, type Team } from '@hitojichi/shared'
 
 // 紛らわしい文字(0,O,1,I)を除いた招待コード用の文字セット
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -33,7 +33,8 @@ export function useTeams() {
     if (!uid) throw new Error('ログインが必要です')
 
     const team = teamSchema.parse({
-      ...input,
+      // 読み込み用スキーマは既存チームの欠損を許すため、保存前に作成用で必須項目を検証する。
+      ...createTeamInput.parse(input),
       memberIds: [uid],
       inviteCode: generateInviteCode(),
       createdBy: uid,

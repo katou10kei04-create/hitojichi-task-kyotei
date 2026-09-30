@@ -13,6 +13,15 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/teams/$(teamId)).data.memberIds;
     }
 
+    function validTeamGoal(data) {
+      // 日付のみの期限。ZodのISO日付と同様に、月の日数とうるう年も確認する。
+      return data.goal is string && data.goal.size() > 0 && data.goal.size() <= 120
+        && data.goal.matches('[\\s\\S]*[^\\s　][\\s\\S]*')
+        && data.goalDueDate is string
+        && (data.goalDueDate.matches('^[0-9]{4}-((0[13578]|1[02])-(0[1-9]|[12][0-9]|3[01])|(0[469]|11)-(0[1-9]|[12][0-9]|30)|02-(0[1-9]|1[0-9]|2[0-8]))$')
+          || data.goalDueDate.matches('^([0-9]{2}([2468][048]|[13579][26]|0[48])|[02468][048]00|[13579][26]00)-02-29$'));
+    }
+
     // プロフィール：ログインユーザーなら閲覧可、本人のみ更新可。称号(titleIds)はFunctionsのみ変更可
     match /users/{uid} {
       allow read: if signedIn();
@@ -31,11 +40,14 @@ service cloud.firestore {
       // 作成者は変更不可。人質（dis称号・team dis称号）を変更できるのは作成者のみ
       allow update: if signedIn() && request.auth.uid in resource.data.memberIds
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy', 'memberIds'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['goal', 'goalDueDate'])
+          || validTeamGoal(request.resource.data))
         && (request.auth.uid == resource.data.createdBy
           || !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['selfDisTitleId', 'teamDisTitleId']));
       allow create: if signedIn() && request.resource.data.memberIds == [request.auth.uid]
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && validTeamGoal(request.resource.data);
 
       // タスク：閲覧はチームメンバー全員、追加・更新・削除は本人（ownerId）のみ
       match /tasks/{taskId} {

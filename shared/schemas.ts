@@ -17,6 +17,10 @@ export type User = z.infer<typeof userSchema>
 export const teamSchema = z.object({
   name: z.string().min(1).max(40),
   description: z.string().max(120).optional(), // 説明なしの既存チームも有効
+  // 既存チームの読み込みを保ち、新規作成時の必須化はcreateTeamInputで行う。
+  goal: z.string().trim().min(1).max(120).optional(),
+  // 日付のみの期限なので、タイムゾーンで日付がずれるTimestampへ変換しない。
+  goalDueDate: z.iso.date().optional(),
   memberIds: z.array(z.string()).min(1),
   inviteCode: z.string(),
   createdBy: z.string(),
@@ -45,12 +49,9 @@ export type Title = z.infer<typeof titleSchema>
 
 /** フォーム入力用 */
 export const updateUserProfileInput = userSchema.pick({ displayName: true })
-export const createTeamInput = teamSchema.pick({
-  name: true,
-  description: true,
-  selfDisTitleId: true,
-  teamDisTitleId: true,
-})
+export const createTeamInput = teamSchema
+  .pick({ name: true, goal: true, goalDueDate: true, selfDisTitleId: true, teamDisTitleId: true })
+  .required({ goal: true, goalDueDate: true })
 export type CreateTeamInput = z.infer<typeof createTeamInput>
 export const updateTeamHostageInput = teamSchema.pick({
   selfDisTitleId: true,

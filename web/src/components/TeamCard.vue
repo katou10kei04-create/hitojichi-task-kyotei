@@ -21,8 +21,9 @@ const props = defineProps<{
 // 相手（人質）がまだ参加していなければ「募集中」
 const isRecruiting = computed(() => props.team.memberIds.length < 2)
 
-// 進行中は一番近い未完了の期限、終了したチームは最後の期限を出す
+// 大目標の設定前に作られたチームだけ、従来どおりタスクから期限を表示する。
 const dueDateLabel = computed(() => {
+  if (props.team.goalDueDate) return props.team.goalDueDate.replaceAll('-', '/')
   if (props.loadFailed) return '取得失敗'
   if (!props.summary) return '…'
   const date = props.summary.nextDueAt ?? props.summary.lastDueAt
@@ -54,10 +55,10 @@ const dueDateLabel = computed(() => {
 
     <h3 class="mt-5 font-display text-2xl break-all">{{ team.name }}</h3>
     <p
-      v-if="team.description?.trim()"
+      v-if="team.goal || team.description?.trim()"
       class="mt-2 text-sm whitespace-pre-wrap break-all text-ink/60"
     >
-      {{ team.description }}
+      {{ team.goal ?? team.description }}
     </p>
 
     <div class="mt-auto pt-5">

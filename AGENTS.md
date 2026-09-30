@@ -109,9 +109,9 @@ titles/{titleId}
 
 Tailwind v4 のため、`web/src/assets/main.css` の `@theme` にカスタムカラーとして登録し、クラス名で使うこと（色コードを直書きしない）。
 
-| 役割 | 色 | 名前（案） |
+| 役割 | 色 | 名前 |
 |---|---|---|
-| メイン | `#F8F7F7` | `base` |
+| メイン | `#F8F7F7` | `canvas`（`text-base` と衝突するため） |
 | アソート | `#7F60CB` | `primary` |
 | アソート | `#242035` | `ink` |
 | アソート | `#C7C6D9` | `muted` |

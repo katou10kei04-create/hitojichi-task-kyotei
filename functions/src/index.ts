@@ -39,6 +39,7 @@ export const joinTeamByInviteCode = onCall(async (request): Promise<JoinTeamResu
   })
 })
 
+// TODO(key): エミュレータでは onSchedule が自動で動かないため、デモ・動作確認用に同じ処理を呼べる onCall があると便利
 export const checkOverdueTasks = onSchedule('every 1 minutes', async () => {
   await processOverdueTasks(getFirestore(), Timestamp.now())
 })

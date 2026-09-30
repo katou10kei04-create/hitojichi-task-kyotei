@@ -2,7 +2,10 @@ import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore'
 import { taskSchema, teamSchema } from '@hitojichi/shared'
 import { logger } from 'firebase-functions'
 
-/** 状態変更と称号付与を同時に確定し、再実行・同時実行でも一度だけ処理する。 */
+/**
+ * 状態変更と称号付与を同時に確定し、再実行・同時実行でも一度だけ処理する。
+ * TODO(key): サボりを重ねたら、より不名誉な称号に格上げする（格上げの決め方・回数・前の称号を残すかを決める）
+ */
 export async function processOverdueTasks(db: Firestore, now: Timestamp) {
   const query = db
     .collectionGroup('tasks')

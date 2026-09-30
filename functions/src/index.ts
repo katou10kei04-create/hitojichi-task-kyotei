@@ -5,10 +5,11 @@
 import { initializeApp } from 'firebase-admin/app'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { setGlobalOptions } from 'firebase-functions/v2'
+import { onDocumentCreated } from 'firebase-functions/v2/firestore'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore'
 import { joinTeamInput, type JoinTeamResult } from '@hitojichi/shared'
-import { processOverdueTasks } from './overdueTasks'
+import { processOverdueTask, processOverdueTasks } from './overdueTasks'
 
 initializeApp()
 setGlobalOptions({ region: 'asia-northeast1' })
@@ -43,3 +44,12 @@ export const joinTeamByInviteCode = onCall(async (request): Promise<JoinTeamResu
 export const checkOverdueTasks = onSchedule('every 1 minutes', async () => {
   await processOverdueTasks(getFirestore(), Timestamp.now())
 })
+
+// 過去の期限で作成されたタスクは、次の定期チェックを待たずに判定する。
+export const checkOverdueTaskOnCreate = onDocumentCreated(
+  'teams/{teamId}/tasks/{taskId}',
+  async (event) => {
+    if (!event.data) return
+    await processOverdueTask(getFirestore(), event.data.ref, Timestamp.now())
+  },
+)

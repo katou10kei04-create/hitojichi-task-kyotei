@@ -7,6 +7,7 @@ import { z } from 'zod'
 /** users/{uid} */
 export const userSchema = z.object({
   displayName: z.string().min(1).max(30),
+  bio: z.string().max(120).optional(), // 自己紹介。未登録の既存ユーザーも有効
   photoURL: z.string().url().nullable(),
   titleIds: z.array(z.string()), // 獲得した称号（Functionsのみ書き込み可）
   equippedTitleId: z.string().min(1).nullable().optional(), // 装備中の称号マスタID。既存ユーザーは未設定
@@ -44,7 +45,8 @@ export const titleSchema = z.object({
 export type Title = z.infer<typeof titleSchema>
 
 /** フォーム入力用 */
-export const updateUserProfileInput = userSchema.pick({ displayName: true })
+export const updateUserProfileInput = userSchema.pick({ displayName: true, bio: true })
+export type UpdateUserProfileInput = z.infer<typeof updateUserProfileInput>
 export const createTeamInput = teamSchema.pick({
   name: true,
   description: true,

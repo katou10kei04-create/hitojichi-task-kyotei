@@ -67,7 +67,11 @@ async function submit() {
   <!-- 一覧と同じ共通部品を使い、画面幅に合わせて入力カードを縦に並べる。 -->
   <form class="mt-8" @submit.prevent="submit">
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-      <BaseCard tag="section" class="min-w-0 p-5 sm:p-6" aria-labelledby="team-info-heading">
+      <BaseCard
+        tag="section"
+        class="flex min-w-0 flex-col p-5 sm:p-6"
+        aria-labelledby="team-info-heading"
+      >
         <div class="flex items-center gap-3">
           <IconTile :icon="Users" tone="muted" />
           <h2 id="team-info-heading" class="font-display text-xl">チーム情報</h2>
@@ -87,7 +91,8 @@ async function submit() {
           />
         </label>
 
-        <label class="mt-5 flex flex-col gap-2 text-sm font-bold">
+        <!-- 称号カードに高さが揃っても下に余白が残らないよう、説明欄で余った高さを使う。 -->
+        <label class="mt-5 flex flex-1 flex-col gap-2 text-sm font-bold">
           <span class="flex items-center gap-2">
             チーム説明
             <StatusChip tone="muted">任意</StatusChip>
@@ -97,7 +102,7 @@ async function submit() {
             maxlength="120"
             rows="4"
             placeholder="例：毎週の目標を共有し、一緒に開発を進めるチームです"
-            class="w-full resize-y rounded-xl border-[3px] border-ink bg-canvas px-4 py-3 outline-none focus:border-primary"
+            class="w-full grow resize-y rounded-xl border-[3px] border-ink bg-canvas px-4 py-3 outline-none focus:border-primary"
           />
           <span class="text-right text-xs font-normal text-ink/60">
             {{ description.length }}/120文字
@@ -114,10 +119,7 @@ async function submit() {
           誰かがサボったときに、本人と仲間に付く称号を選んでください。
         </p>
 
-        <!-- 共用入力欄の装飾はこの領域に限定し、タスク管理画面には影響させない。 -->
-        <div
-          class="mt-6 flex flex-col gap-5 [&_label]:gap-2 [&_label]:font-bold [&_select]:w-full [&_select]:rounded-xl [&_select]:border-[3px] [&_select]:border-ink [&_select]:bg-canvas [&_select]:px-4 [&_select]:py-3 [&_select]:outline-none [&_select:focus]:border-primary"
-        >
+        <div class="mt-6 flex flex-col gap-4">
           <HostageTitleFields
             v-model:self-dis-title-id="selfDisTitleId"
             v-model:team-dis-title-id="teamDisTitleId"

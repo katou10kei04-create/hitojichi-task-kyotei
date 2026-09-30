@@ -34,7 +34,7 @@ async function logout() {
 <template>
   <div class="min-h-dvh">
     <header v-if="showNav" class="border-b-4 border-accent bg-ink/60">
-      <div class="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
+      <div class="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <RouterLink
           to="/"
           class="flex shrink-0 items-center gap-3"
@@ -47,41 +47,43 @@ async function logout() {
           >
         </RouterLink>
 
-        <nav class="ml-auto flex items-center gap-1" aria-label="メインメニュー">
-          <RouterLink
-            v-for="item in navItems"
-            :key="item.to"
-            :to="item.to"
-            :aria-label="item.label"
-            class="flex items-center gap-1.5 rounded-xl border-2 border-transparent px-3 py-2 font-bold text-white/70 transition hover:text-white"
-            exact-active-class="border-accent! bg-primary text-white!"
-          >
-            <component :is="item.icon" :size="20" aria-hidden="true" />
-            <span class="hidden md:inline">{{ item.label }}</span>
-          </RouterLink>
-          <button
-            type="button"
-            aria-label="ログアウト"
-            class="flex items-center gap-1.5 rounded-xl border-2 border-transparent px-3 py-2 font-bold text-white/70 transition hover:text-white"
-            @click="logout"
-          >
-            <LogOut :size="20" aria-hidden="true" />
-            <span class="hidden md:inline">ログアウト</span>
-          </button>
-        </nav>
+        <div class="flex items-center gap-4">
+          <nav class="flex items-center gap-1" aria-label="メインメニュー">
+            <RouterLink
+              v-for="item in navItems"
+              :key="item.to"
+              :to="item.to"
+              :aria-label="item.label"
+              class="flex items-center gap-1.5 rounded-xl border-2 border-transparent px-3 py-2 font-bold text-white/70 transition hover:text-white"
+              exact-active-class="border-accent! bg-primary text-white!"
+            >
+              <component :is="item.icon" :size="20" aria-hidden="true" />
+              <span class="hidden md:inline">{{ item.label }}</span>
+            </RouterLink>
+            <button
+              type="button"
+              aria-label="ログアウト"
+              class="flex items-center gap-1.5 rounded-xl border-2 border-transparent px-3 py-2 font-bold text-white/70 transition hover:text-white"
+              @click="logout"
+            >
+              <LogOut :size="20" aria-hidden="true" />
+              <span class="hidden md:inline">ログアウト</span>
+            </button>
+          </nav>
 
-        <div
-          class="hidden shrink-0 items-center gap-3 rounded-full border-2 border-white/60 py-1.5 pr-5 pl-1.5 sm:flex"
-        >
-          <span
-            class="grid size-10 place-items-center rounded-full border-2 border-ink bg-accent font-display text-ink"
-            aria-hidden="true"
+          <div
+            class="hidden shrink-0 items-center gap-3 rounded-full border-2 border-white/60 py-1.5 pr-5 pl-1.5 sm:flex"
           >
-            {{ initial }}
-          </span>
-          <div class="leading-tight">
-            <p class="max-w-28 truncate font-bold text-white">{{ displayName }}</p>
-            <p class="font-dot text-xs text-accent">★ {{ clearCount }} CLEAR</p>
+            <span
+              class="grid size-10 place-items-center rounded-full border-2 border-ink bg-accent font-display text-ink"
+              aria-hidden="true"
+            >
+              {{ initial }}
+            </span>
+            <div class="leading-tight">
+              <p class="max-w-28 truncate font-bold text-white">{{ displayName }}</p>
+              <p class="font-dot text-xs text-accent">★ {{ clearCount }} CLEAR</p>
+            </div>
           </div>
         </div>
       </div>

@@ -8,6 +8,8 @@
   --color-ink: #242035;
   --color-muted: #c7c6d9;
   --color-accent: #f2d516;
+  --color-late: #ffedd5;
+  --color-on-late: #9a3412;
 
   /* フォント（index.html で Google Fonts から読み込む） */
   --font-sans: 'M PLUS Rounded 1c', ui-sans-serif, system-ui, sans-serif;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Timestamp } from 'firebase/firestore'
 import { useCurrentUser } from 'vuefire'
@@ -25,7 +25,7 @@ const {
   teamProgress,
   isCreator,
   createTask,
-  completeTask,
+  setTaskStatus,
   updateTask,
   deleteTask,
   updateHostage,
@@ -43,8 +43,9 @@ const filters = [
   { value: 'done', label: '達成' },
 ] as const
 const isCreatingTask = ref(false)
+const now = ref(Date.now())
 const completedCount = computed(() => tasks.value.filter((task) => task.status === 'done').length)
-const overdueCount = computed(() => tasks.value.filter((task) => task.status === 'overdue').length)
+const overdueCount = computed(() => tasks.value.filter(isDisplayOverdue).length)
 const nearestDueAt = computed(() => {
   const dates = tasks.value
     .filter((task) => task.status === 'todo')
@@ -68,6 +69,7 @@ const memberCards = computed(() => {
       uid,
       tasks: memberTasks.filter(
         (task) =>
+          task.id === editingTaskId.value ||
           activeFilter.value === 'all' ||
           (activeFilter.value === 'done' ? task.status === 'done' : task.status !== 'done'),
       ),
@@ -90,6 +92,16 @@ function titleName(titleId: string | undefined) {
 function formatDueAt(dueAt: Task['dueAt']) {
   const date = dueAt instanceof Timestamp ? dueAt.toDate() : dueAt
   return date.toLocaleString('ja-JP')
+}
+
+function isCompletedLate(task: Task) {
+  return task.status === 'done' && (task.completedLate ?? task.completedAfterOverdue ?? false)
+}
+
+// Schedulerを待つ間も表示だけ補完する。正式な状態・称号はバックエンドが確定する。
+function isDisplayOverdue(task: Task) {
+  const dueAt = task.dueAt instanceof Timestamp ? task.dueAt.toDate() : task.dueAt
+  return task.status === 'overdue' || (task.status === 'todo' && dueAt.getTime() <= now.value)
 }
 
 const statusLabel: Record<(typeof taskStatusSchema)['options'][number], string> = {
@@ -135,6 +147,20 @@ const title = ref('')
 const dueAt = ref('')
 const errorMessage = ref('')
 const isSubmitting = ref(false)
+// 分単位の入力なので、選択できる最初の未来の分へ切り上げる。
+const minDueAt = ref('')
+function refreshMinDueAt() {
+  now.value = Date.now()
+  const date = new Date(Math.ceil((now.value + 1) / 60000) * 60000)
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  minDueAt.value = local.toISOString().slice(0, 16)
+}
+let minDueAtTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  refreshMinDueAt()
+  minDueAtTimer = setInterval(refreshMinDueAt, 1000)
+})
+onUnmounted(() => clearInterval(minDueAtTimer))
 
 async function submit() {
   errorMessage.value = ''
@@ -144,6 +170,12 @@ async function submit() {
   })
   if (!parsed.success) {
     errorMessage.value = 'タスク名と期限を入力してください。'
+    return
+  }
+
+  if (parsed.data.dueAt.getTime() <= Date.now()) {
+    errorMessage.value = '期限は現在より未来にしてください。'
+    refreshMinDueAt()
     return
   }
 
@@ -234,10 +266,10 @@ async function onComplete(task: Task & { id: string }) {
   taskErrorMessage.value = ''
   busyTaskId.value = task.id
   try {
-    await completeTask(task.id)
+    await setTaskStatus(task.id, task.status === 'done' ? 'todo' : 'done')
   } catch (error) {
     console.error(error)
-    taskErrorMessage.value = '完了にできませんでした。タスクの状態を確認してください。'
+    taskErrorMessage.value = '状態を変更できませんでした。タスクの状態を確認してください。'
   } finally {
     busyTaskId.value = null
   }
@@ -425,15 +457,16 @@ async function onComplete(task: Task & { id: string }) {
               <li
                 v-for="task in card.tasks"
                 :key="task.id"
-                class="task-item flex flex-wrap items-center gap-3 rounded-2xl border-2 border-ink bg-white p-4 shadow-sm"
+                class="task-item flex flex-wrap items-center gap-3 rounded-2xl border-2 border-ink p-4 shadow-sm"
                 :class="{
                   'is-done': task.status === 'done',
-                  'is-overdue': task.status === 'overdue',
+                  'is-late': isDisplayOverdue(task) || isCompletedLate(task),
                 }"
               >
                 <form
                   v-if="editingTaskId === task.id && task.ownerId === currentUser?.uid"
-                  class="flex flex-1 flex-col gap-3"
+                  :id="`edit-task-${task.id}`"
+                  class="flex w-full flex-col gap-3"
                   @submit.prevent="saveTask(task.id)"
                 >
                   <label class="flex flex-col gap-1 text-sm">
@@ -458,70 +491,82 @@ async function onComplete(task: Task & { id: string }) {
                       :disabled="!!busyTaskId"
                     />
                   </label>
-                  <div class="flex gap-2">
-                    <button
-                      type="submit"
-                      class="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
-                      :disabled="!!busyTaskId"
-                    >
-                      保存
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded border px-3 py-1.5 text-sm"
-                      :disabled="!!busyTaskId"
-                      @click="editingTaskId = null"
-                    >
-                      キャンセル
-                    </button>
-                  </div>
                 </form>
                 <div v-else class="min-w-0 basis-full break-words">
-                  <p
-                    class="mb-2 font-bold"
-                    :class="{ 'line-through text-ink/60': task.status === 'done' }"
-                  >
-                    {{ task.title }}
-                  </p>
+                  <div class="task-header">
+                    <p class="task-name flex items-start gap-2 font-bold">
+                      <span class="task-check" aria-hidden="true">
+                        <Check v-if="task.status === 'done'" :size="16" :stroke-width="3" />
+                      </span>
+                      <span class="min-w-0" :class="{ 'line-through': task.status === 'done' }">
+                        {{ task.title }}
+                      </span>
+                    </p>
+                    <div v-if="task.ownerId === currentUser?.uid" class="task-header-actions">
+                      <button
+                        type="button"
+                        class="task-icon-button"
+                        aria-label="編集"
+                        title="編集"
+                        :disabled="!!busyTaskId"
+                        @click="startEditTask(task)"
+                      >
+                        <Pencil :size="20" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        class="task-icon-button"
+                        aria-label="削除"
+                        title="削除"
+                        :disabled="!!busyTaskId"
+                        @click="onDelete(task)"
+                      >
+                        <Trash2 :size="20" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
                   <p class="task-due text-xs">期限: {{ formatDueAt(task.dueAt) }}</p>
                 </div>
                 <span
                   class="mr-auto rounded-full px-3 py-1 text-xs font-bold"
                   :class="
-                    task.status === 'done'
-                      ? 'bg-primary text-white'
-                      : task.status === 'overdue'
-                        ? 'bg-ink text-accent'
-                        : 'bg-accent text-ink'
+                    isCompletedLate(task)
+                      ? 'bg-late text-on-late'
+                      : task.status === 'done'
+                        ? 'bg-primary text-white'
+                        : isDisplayOverdue(task)
+                          ? 'bg-late text-on-late'
+                          : 'bg-accent text-ink'
                   "
-                  >{{ statusLabel[task.status] }}</span
+                  >{{
+                    isCompletedLate(task)
+                      ? '期限切れ完了'
+                      : isDisplayOverdue(task)
+                        ? '期限切れ'
+                        : statusLabel[task.status]
+                  }}</span
                 >
-                <template v-if="task.ownerId === currentUser?.uid && editingTaskId !== task.id">
+                <div v-if="task.ownerId === currentUser?.uid" class="task-actions">
+                  <div v-if="editingTaskId === task.id" class="flex flex-wrap gap-2">
+                    <button type="submit" :form="`edit-task-${task.id}`" :disabled="!!busyTaskId">
+                      保存
+                    </button>
+                    <button type="button" :disabled="!!busyTaskId" @click="editingTaskId = null">
+                      キャンセル
+                    </button>
+                  </div>
+                  <!-- 完了にできるのは本人のタスクだけ（Firestoreルールでも制限） -->
                   <button
-                    class="flex items-center gap-1 rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+                    v-if="editingTaskId !== task.id"
+                    type="button"
+                    class="task-status-action"
+                    @click="onComplete(task)"
                     :disabled="!!busyTaskId"
-                    @click="startEditTask(task)"
                   >
-                    <Pencil :size="16" />編集
+                    <Check :size="16" />
+                    {{ task.status === 'done' ? '未完了に戻す' : '完了' }}
                   </button>
-                  <button
-                    class="flex items-center gap-1 rounded border px-3 py-1.5 text-sm disabled:opacity-50"
-                    :disabled="!!busyTaskId"
-                    @click="onDelete(task)"
-                  >
-                    <Trash2 :size="16" />削除
-                  </button>
-                </template>
-                <!-- 完了にできるのは本人のタスクだけ（Firestoreルールでも制限） -->
-                <button
-                  v-if="task.status === 'todo' && task.ownerId === currentUser?.uid"
-                  class="flex items-center gap-1 rounded border px-3 py-1.5 text-sm"
-                  @click="onComplete(task)"
-                  :disabled="!!busyTaskId"
-                >
-                  <Check :size="16" />
-                  完了
-                </button>
+                </div>
               </li>
             </ul>
 
@@ -556,7 +601,14 @@ async function onComplete(task: Task & { id: string }) {
               </label>
               <label class="flex flex-col gap-1 text-sm">
                 期限
-                <input v-model="dueAt" type="datetime-local" class="rounded border px-3 py-2" />
+                <input
+                  v-model="dueAt"
+                  type="datetime-local"
+                  :min="minDueAt"
+                  required
+                  class="rounded border px-3 py-2"
+                  @focus="refreshMinDueAt"
+                />
               </label>
 
               <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
@@ -618,7 +670,7 @@ async function onComplete(task: Task & { id: string }) {
   @apply grid gap-3 sm:grid-cols-2;
 }
 .hostage-title {
-  @apply min-w-0 rounded-xl border border-ink/15 bg-white/50 px-4 py-3;
+  @apply min-w-0 rounded-xl border-2 border-ink bg-white/50 px-4 py-3;
 }
 .hostage-title dt {
   @apply mb-1 text-xs font-normal text-ink/75;
@@ -677,21 +729,51 @@ async function onComplete(task: Task & { id: string }) {
   @apply bg-accent py-3 shadow-sm hover:bg-accent/80;
 }
 .task-item {
-  @apply gap-2 rounded-xl p-3 text-sm;
+  @apply gap-2 rounded-xl bg-white p-3 text-sm text-ink;
 }
-.task-item.is-done {
-  @apply bg-canvas;
-}
-.task-item.is-overdue {
+.task-item.is-late {
   @apply bg-ink text-white;
+}
+.task-check {
+  @apply inline-flex size-5 shrink-0 items-center justify-center rounded border-2 border-ink bg-white;
+}
+.is-done .task-check {
+  @apply bg-accent text-ink;
 }
 .task-due {
   @apply text-ink/60;
 }
-.is-overdue .task-due {
-  @apply text-accent;
+.is-done .task-due {
+  @apply text-muted;
+}
+.is-late .task-due {
+  @apply text-late;
+}
+.task-item input {
+  @apply text-ink;
 }
 .task-item button {
-  @apply px-2 py-1 text-xs text-ink;
+  @apply px-2 py-1 text-xs text-ink hover:bg-muted;
+}
+.task-actions {
+  @apply flex w-full flex-wrap items-center gap-2;
+}
+.task-header {
+  @apply mb-2 flex flex-wrap items-start gap-2;
+}
+.task-name {
+  @apply min-w-0 flex-1 basis-24;
+}
+.task-header-actions {
+  @apply ml-auto flex shrink-0 gap-2;
+}
+.task-actions button {
+  @apply min-h-11;
+}
+.task-item .task-icon-button {
+  @apply flex size-11 shrink-0 items-center justify-center p-0;
+}
+.task-status-action {
+  @apply ml-auto flex w-36 shrink-0 items-center justify-center gap-1 whitespace-nowrap;
 }
 </style>

@@ -48,7 +48,7 @@ export function useTeams() {
       functions,
       'joinTeamByInviteCode',
     )(parsed)
-    return result.data.teamId
+    return result.data
   }
 
   return { teams, createTeam, joinTeam }

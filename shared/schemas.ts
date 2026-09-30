@@ -64,4 +64,4 @@ export const updateTaskInput = taskSchema.pick({ title: true, dueAt: true })
 export type UpdateTaskInput = z.infer<typeof updateTaskInput>
 export const joinTeamInput = z.object({ inviteCode: z.string().trim().min(1).max(128) })
 export type JoinTeamInput = z.infer<typeof joinTeamInput>
-export type JoinTeamResult = { teamId: string }
+export type JoinTeamResult = { teamId: string; teamName: string } // 参加後の画面でチーム名を表示する

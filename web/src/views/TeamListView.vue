@@ -86,10 +86,10 @@ async function submitJoin() {
   joinMessage.value = ''
   isJoining.value = true
   try {
-    await joinTeam({ inviteCode: inviteCode.value })
+    const { teamName } = await joinTeam({ inviteCode: inviteCode.value })
     inviteCode.value = ''
     closeJoinDialog()
-    joinMessage.value = 'チームに参加しました（参加済みの場合もそのまま利用できます）。'
+    joinMessage.value = `「${teamName}」に参加しました（参加済みの場合もそのまま利用できます）。`
   } catch (error) {
     joinError.value =
       error instanceof FirebaseError &&

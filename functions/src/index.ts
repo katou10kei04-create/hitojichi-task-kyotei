@@ -35,7 +35,7 @@ export const joinTeamByInviteCode = onCall(async (request): Promise<JoinTeamResu
         '招待コードが重複しています。作成者に確認してください',
       )
     transaction.update(team.ref, { memberIds: FieldValue.arrayUnion(uid) })
-    return { teamId: team.id }
+    return { teamId: team.id, teamName: team.get('name') }
   })
 })
 

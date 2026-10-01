@@ -1,7 +1,7 @@
 import { doc, updateDoc } from 'firebase/firestore'
 import { computed } from 'vue'
 import { useCurrentUser, useDocument, useFirestore } from 'vuefire'
-import { updateUserProfileInput, type User } from '@hitojichi/shared'
+import { updateUserProfileInput, type UpdateUserProfileInput, type User } from '@hitojichi/shared'
 
 /** ログイン中ユーザーの users/{uid} プロフィール（titleIdsなど）の取得・更新 */
 export function useCurrentUserProfile() {
@@ -15,13 +15,12 @@ export function useCurrentUserProfile() {
 
   const profile = useDocument<User>(userRef)
 
-  async function updateDisplayName(displayName: string) {
+  async function updateProfile(input: UpdateUserProfileInput) {
     const uid = currentUser.value?.uid
     if (!uid) throw new Error('ログインが必要です')
 
-    const input = updateUserProfileInput.parse({ displayName })
-    await updateDoc(doc(db, 'users', uid), input)
+    await updateDoc(doc(db, 'users', uid), updateUserProfileInput.parse(input))
   }
 
-  return { profile, updateDisplayName }
+  return { profile, updateProfile }
 }

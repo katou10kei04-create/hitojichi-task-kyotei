@@ -1,26 +1,24 @@
 <script setup lang="ts">
-import { computed, ref, useId } from 'vue'
-import { useCurrentUser } from 'vuefire'
-import { Check, Crown, Lock, Skull, Star, Trophy, X } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { Crown, Lock, Skull, Star, Trophy } from 'lucide-vue-next'
 import { isAchievementTitle } from '@hitojichi/shared'
 import { useTitles } from '@/composables/useTitles'
 import { useCurrentUserProfile } from '@/composables/useCurrentUserProfile'
 import { useTeams } from '@/composables/useTeams'
 import { useCompletedTaskCount } from '@/composables/useCompletedTaskCount'
-import { useOverdueTasks } from '@/composables/useOverdueTasks'
+import { useActiveDisTitles } from '@/composables/useActiveDisTitles'
 import BaseButton from '@/components/BaseButton.vue'
+import EquipTitleDialog from '@/components/EquipTitleDialog.vue'
 import IconTile from '@/components/IconTile.vue'
 import SectionLabel from '@/components/SectionLabel.vue'
 import StatusChip from '@/components/StatusChip.vue'
 import TeamProgressBar from '@/components/TeamProgressBar.vue'
 
-const currentUser = useCurrentUser()
 const { titles } = useTitles()
-const { profile, updateEquippedTitle } = useCurrentUserProfile()
+const { profile } = useCurrentUserProfile()
 const { teams } = useTeams()
 const teamIds = () => teams.value.map((team) => team.id)
 const { count: completedCount } = useCompletedTaskCount(teamIds)
-const { ownerIdsByTeam, pending: overduePending, failed: overdueFailed } = useOverdueTasks(teamIds)
 
 const ownedTitleIds = computed(() => new Set(profile.value?.titleIds ?? []))
 
@@ -41,69 +39,19 @@ const achievements = computed(() =>
 )
 
 // ---- プロフィールに称号を設定（獲得済みの実績から選ぶ） ----
-const ownedAchievements = computed(() => achievements.value.filter((title) => title.owned))
 const equippedTitle = computed(() =>
   titles.value.find((title) => title.id === profile.value?.equippedTitleId),
 )
-const equipDialog = ref<HTMLDialogElement | null>(null)
-const equipDialogHeadingId = useId()
-const isEquipping = ref(false)
-const equipError = ref('')
-
-function openEquipDialog() {
-  equipError.value = ''
-  equipDialog.value?.showModal()
-}
-
-async function equip(titleId: string | null) {
-  if (isEquipping.value) return
-  equipError.value = ''
-  isEquipping.value = true
-  try {
-    await updateEquippedTitle({ equippedTitleId: titleId })
-    equipDialog.value?.close()
-  } catch (error) {
-    console.error(error)
-    equipError.value = '称号の設定に失敗しました。もう一度お試しください。'
-  } finally {
-    isEquipping.value = false
-  }
-}
+const isEquipDialogOpen = ref(false)
 
 // ---- dis称号：チームに期限切れタスクがあれば発動中。発動中のものだけ並べる ----
+const {
+  disTitles: activeDisTitles,
+  pending: overduePending,
+  failed: overdueFailed,
+} = useActiveDisTitles(teams, titles)
 const disPending = computed(() => teams.pending.value || overduePending.value)
 const disError = computed(() => teams.error.value || overdueFailed.value)
-const activeDisTitles = computed(() => {
-  const uid = currentUser.value?.uid
-  if (!uid) return []
-  const titleName = (id: string) =>
-    titles.value.find((title) => title.id === id)?.name ?? '称号が見つかりません'
-  return teams.value.flatMap((team) => {
-    const ownerIds = ownerIdsByTeam.value[team.id] ?? []
-    const cards = []
-    // 自分のタスクが期限切れ → 自分に dis称号
-    if (ownerIds.includes(uid)) {
-      cards.push({
-        key: `${team.id}-self`,
-        label: 'dis称号',
-        name: titleName(team.selfDisTitleId),
-        teamName: team.name,
-        release: '自分の未達成が解消されると解除',
-      })
-    }
-    // 相棒のタスクが期限切れ → 人質の自分に team dis称号
-    if (ownerIds.some((id) => id !== uid)) {
-      cards.push({
-        key: `${team.id}-team`,
-        label: 'Team dis称号',
-        name: titleName(team.teamDisTitleId),
-        teamName: team.name,
-        release: '相棒の未達成が解消されると解除',
-      })
-    }
-    return cards
-  })
-})
 </script>
 
 <template>
@@ -152,7 +100,7 @@ const activeDisTitles = computed(() => {
   </ul>
 
   <div class="mt-8 flex flex-wrap items-center gap-4">
-    <BaseButton variant="outline" :disabled="achievementsPending" @click="openEquipDialog">
+    <BaseButton variant="outline" :disabled="achievementsPending" @click="isEquipDialogOpen = true">
       <Crown :size="20" :stroke-width="2.5" aria-hidden="true" />
       プロフィールに称号を設定
     </BaseButton>
@@ -205,75 +153,5 @@ const activeDisTitles = computed(() => {
     </li>
   </ul>
 
-  <Teleport to="body">
-    <dialog
-      ref="equipDialog"
-      :aria-labelledby="equipDialogHeadingId"
-      class="m-auto max-h-[85dvh] w-[calc(100%_-_2rem)] max-w-xl overflow-y-auto rounded-3xl border-[3px] border-ink bg-canvas p-0 text-ink shadow backdrop:bg-ink/60"
-      @click.self="equipDialog?.close()"
-    >
-      <div class="p-5 sm:p-6">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <p class="font-dot text-xs tracking-widest text-primary">EQUIP TITLE</p>
-            <h3 :id="equipDialogHeadingId" class="mt-2 font-display text-xl">
-              プロフィールに称号を設定
-            </h3>
-          </div>
-          <button
-            type="button"
-            aria-label="称号の設定を閉じる"
-            class="grid size-10 shrink-0 place-items-center rounded-full border-[3px] border-ink bg-white transition hover:bg-muted/30 focus-visible:outline-2 focus-visible:outline-primary"
-            @click="equipDialog?.close()"
-          >
-            <X :size="20" aria-hidden="true" />
-          </button>
-        </div>
-        <p class="mt-3 text-sm text-ink/70">獲得した実績から、プロフィールに出す称号を選べます。</p>
-        <p v-if="equipError" role="alert" class="mt-3 text-sm font-bold text-red-600">
-          {{ equipError }}
-        </p>
-
-        <p v-if="ownedAchievements.length === 0" class="mt-5 text-sm text-ink/60">
-          まだ獲得した実績がありません。タスクを達成して称号を手に入れましょう。
-        </p>
-        <div v-else class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <button
-            v-for="title in ownedAchievements"
-            :key="title.id"
-            type="button"
-            :aria-pressed="equippedTitle?.id === title.id"
-            :disabled="isEquipping"
-            class="rounded-2xl border-[3px] p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-            :class="
-              equippedTitle?.id === title.id
-                ? 'border-primary bg-primary/10'
-                : 'border-ink bg-white'
-            "
-            @click="equip(title.id)"
-          >
-            <span class="flex items-center justify-between gap-2">
-              <IconTile :icon="Crown" tone="accent" />
-              <span
-                v-if="equippedTitle?.id === title.id"
-                class="flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-xs font-bold text-white"
-              >
-                <Check :size="13" aria-hidden="true" />装備中
-              </span>
-            </span>
-            <span class="mt-3 block font-display break-all">{{ title.name }}</span>
-            <span class="mt-2 block text-xs leading-relaxed text-ink/70">
-              {{ title.description }}
-            </span>
-          </button>
-        </div>
-
-        <div v-if="equippedTitle" class="mt-5 flex justify-end">
-          <BaseButton variant="outline" size="sm" :disabled="isEquipping" @click="equip(null)">
-            称号を外す
-          </BaseButton>
-        </div>
-      </div>
-    </dialog>
-  </Teleport>
+  <EquipTitleDialog v-model:open="isEquipDialogOpen" :titles="titles" />
 </template>

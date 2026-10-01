@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { FirebaseError } from 'firebase/app'
-import { Crown, KeyRound, Link2, Plus, Skull, Trophy, Users } from 'lucide-vue-next'
-import { isAchievementTitle } from '@hitojichi/shared'
+import { CircleCheck, Crown, KeyRound, Link2, Plus, Skull, Trophy, Users } from 'lucide-vue-next'
 import { useTeams } from '@/composables/useTeams'
 import { useCurrentUserProfile } from '@/composables/useCurrentUserProfile'
 import { useTitles } from '@/composables/useTitles'
 import { useCompletedTaskCount } from '@/composables/useCompletedTaskCount'
 import { useTeamTaskSummaries } from '@/composables/useTeamTaskSummaries'
+import { useActiveDisTitles } from '@/composables/useActiveDisTitles'
 import BaseButton from '@/components/BaseButton.vue'
+import BaseDialog from '@/components/BaseDialog.vue'
+import EquipTitleDialog from '@/components/EquipTitleDialog.vue'
 import IconTile from '@/components/IconTile.vue'
 import SectionLabel from '@/components/SectionLabel.vue'
 import StatCard from '@/components/StatCard.vue'
@@ -20,6 +22,7 @@ const { profile } = useCurrentUserProfile()
 const { titles } = useTitles()
 const {
   count: completedTaskCount,
+  tasks: completedTasks,
   pending: completedPending,
   failed: completedFailed,
 } = useCompletedTaskCount(() => teams.value.map((team) => team.id))
@@ -39,18 +42,25 @@ const equippedTitleStat = computed<Stat>(() => {
   if (titles.pending.value) return { value: '読み込み中…' }
   return { value: titles.value.find((title) => title.id === id)?.name ?? '称号が見つかりません' }
 })
+// 期限切れタスクから計算した「発動中」のdis称号（称号画面と同じ判定）
+const { disTitles, pending: disPending, failed: disFailed } = useActiveDisTitles(teams, titles)
+const isDisLoading = computed(() => teams.pending.value || disPending.value)
 const disTitleStat = computed<Stat>(() => {
-  if (profile.error.value) return { value: '取得失敗' }
-  if (profile.pending.value) return { value: '読み込み中…' }
-  if (titles.error.value) return { value: '取得失敗' }
-  if (titles.pending.value) return { value: '読み込み中…' }
-  // 実績の称号は除いて数える
-  const ownedIds = new Set(profile.value?.titleIds ?? [])
-  const count = titles.value.filter(
-    (title) => ownedIds.has(title.id) && !isAchievementTitle(title),
-  ).length
-  return { value: String(count), unit: '件' }
+  if (teams.error.value || disFailed.value || titles.error.value) return { value: '取得失敗' }
+  if (isDisLoading.value || titles.pending.value) return { value: '読み込み中…' }
+  const [first, ...rest] = disTitles.value
+  if (!first) return { value: 'なし' }
+  return rest.length > 0 ? { value: `${first.name} ほか${rest.length}件` } : { value: first.name }
 })
+
+// サマリーカードをクリックしたときのポップアップ
+const isCompletedDialogOpen = ref(false)
+const isEquipDialogOpen = ref(false)
+const isDisDialogOpen = ref(false)
+const teamNameById = computed(() => new Map(teams.value.map((team) => [team.id, team.name])))
+const formatDate = (date: Date) =>
+  date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' })
+
 // 見出し「〇〇のチーム」。表示名が読み込めるまでは「チーム」だけ出す
 const teamHeading = computed(() => {
   const name = profile.value?.displayName
@@ -114,9 +124,27 @@ const loadError = computed(() => teams.error.value)
   />
 
   <section class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-3" aria-label="ユーザーサマリー">
-    <StatCard :icon="Trophy" tone="primary" label="達成タスク" v-bind="completedStat" />
-    <StatCard :icon="Crown" tone="accent" label="装備中の称号" v-bind="equippedTitleStat" />
-    <StatCard :icon="Skull" tone="ink" label="付いているdis称号" v-bind="disTitleStat" />
+    <StatCard
+      :icon="Trophy"
+      tone="primary"
+      label="達成タスク"
+      v-bind="completedStat"
+      @click="isCompletedDialogOpen = true"
+    />
+    <StatCard
+      :icon="Crown"
+      tone="accent"
+      label="装備中の称号"
+      v-bind="equippedTitleStat"
+      @click="isEquipDialogOpen = true"
+    />
+    <StatCard
+      :icon="Skull"
+      tone="ink"
+      label="付いているdis称号"
+      v-bind="disTitleStat"
+      @click="isDisDialogOpen = true"
+    />
   </section>
 
   <div class="mt-10 flex flex-wrap items-end justify-between gap-6">
@@ -201,6 +229,69 @@ const loadError = computed(() => teams.error.value)
   >
     7日たつと、自動で消去されます。
   </p>
+
+  <BaseDialog v-model:open="isCompletedDialogOpen" eyebrow="CLEARED TASKS" title="達成したタスク">
+    <p v-if="completedPending" class="mt-5 text-sm text-ink/60">読み込み中…</p>
+    <p v-else-if="completedFailed" role="alert" class="mt-5 text-sm font-bold text-red-600">
+      タスクの取得に失敗しました。
+    </p>
+    <p v-else-if="completedTasks.length === 0" class="mt-5 text-sm text-ink/60">
+      まだ達成したタスクはありません。最初の1件を片付けましょう！
+    </p>
+    <ul v-else class="mt-5 flex flex-col gap-3">
+      <li
+        v-for="task in completedTasks"
+        :key="`${task.teamId}-${task.id}`"
+        class="flex min-w-0 items-center gap-3 rounded-2xl border-[3px] border-ink bg-white px-4 py-3"
+      >
+        <CircleCheck
+          :size="24"
+          :stroke-width="2.5"
+          class="shrink-0 text-primary"
+          aria-hidden="true"
+        />
+        <div class="min-w-0">
+          <p class="font-extrabold break-all">{{ task.title }}</p>
+          <p class="mt-0.5 text-xs break-all text-ink/60">
+            {{ teamNameById.get(task.teamId) ?? 'チーム' }}
+            <template v-if="task.dueAt"> ／ 期限 {{ formatDate(task.dueAt) }}</template>
+          </p>
+        </div>
+      </li>
+    </ul>
+  </BaseDialog>
+
+  <EquipTitleDialog v-model:open="isEquipDialogOpen" :titles="titles" />
+
+  <BaseDialog v-model:open="isDisDialogOpen" eyebrow="DIS TITLES" title="付いているdis称号">
+    <p v-if="isDisLoading" class="mt-5 text-sm text-ink/60">読み込み中…</p>
+    <p v-else-if="disFailed" role="alert" class="mt-5 text-sm font-bold text-red-600">
+      dis称号の状態の取得に失敗しました。
+    </p>
+    <p v-else-if="disTitles.length === 0" class="mt-5 text-sm text-ink/60">
+      付いているdis称号はありません。この調子で期限を守りましょう！
+    </p>
+    <ul v-else class="mt-5 flex flex-col gap-3">
+      <li
+        v-for="dis in disTitles"
+        :key="dis.key"
+        class="flex min-w-0 items-start gap-4 rounded-2xl border-[3px] border-ink bg-ink px-5 py-4 text-white"
+      >
+        <IconTile :icon="Skull" tone="accent" />
+        <div class="min-w-0">
+          <span
+            class="inline-block rounded-full px-3 py-0.5 text-xs font-bold"
+            :class="dis.label === 'dis称号' ? 'bg-muted text-ink' : 'bg-primary text-white'"
+          >
+            {{ dis.label }}
+          </span>
+          <h3 class="mt-2 font-display text-lg break-all text-accent">{{ dis.name }}</h3>
+          <p v-if="dis.description" class="mt-1 text-sm break-all">{{ dis.description }}</p>
+          <p class="mt-1 text-xs break-all text-white/70">{{ dis.teamName }}・{{ dis.release }}</p>
+        </div>
+      </li>
+    </ul>
+  </BaseDialog>
 
   <Teleport to="body">
     <dialog

@@ -11,6 +11,7 @@ import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore'
 import { joinTeamInput, type JoinTeamResult } from '@hitojichi/shared'
 import { processOverdueTask, processOverdueTasks } from './overdueTasks'
 import { grantAchievementTitles } from './achievementTitles'
+import { deleteExpiredTeams } from './expiredTeams'
 
 initializeApp()
 setGlobalOptions({ region: 'asia-northeast1' })
@@ -43,6 +44,21 @@ export const joinTeamByInviteCode = onCall(async (request): Promise<JoinTeamResu
 
 export const checkOverdueTasks = onSchedule('every 1 minutes', async () => {
   await processOverdueTasks(getFirestore(), Timestamp.now())
+})
+
+export const cleanupExpiredTeams = onSchedule(
+  { schedule: '0 0 * * *', timeZone: 'Asia/Tokyo' },
+  async () => {
+    await deleteExpiredTeams(getFirestore(), Timestamp.now())
+  },
+)
+
+// エミュレータの動作確認用。本番では実行できない。
+export const runExpiredTeamCleanup = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です')
+  if (process.env.FUNCTIONS_EMULATOR !== 'true')
+    throw new HttpsError('permission-denied', 'エミュレータでのみ実行できます')
+  return deleteExpiredTeams(getFirestore(), Timestamp.now())
 })
 
 // エミュレータでは onSchedule が自動で動かないため、動作確認用に同じ処理を手動で呼ぶ。本番では使えない

@@ -4,6 +4,9 @@
  */
 import { z } from 'zod'
 
+// 参加処理の上限と画面の募集表示を同じ人数に揃える。
+export const MAX_TEAM_MEMBERS = 5
+
 /** users/{uid} */
 export const userSchema = z.object({
   displayName: z.string().min(1).max(30),

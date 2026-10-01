@@ -97,6 +97,51 @@ async function main() {
     await denied(updateDoc(bRef, { memberIds: [b.user.uid] }))
     await denied(updateDoc(bRef, { selfDisTitleId: 'changed' }))
     await updateDoc(teamRef, { selfDisTitleId: 'creator-change' })
+
+    // 5人目は参加でき、6人目はFunctionsで拒否される。満員でも参加済みの人は再入力できる。
+    const c = await client('C')
+    const d = await client('D')
+    const e = await client('E')
+    const f = await client('F')
+    for (const member of [c, d, e]) {
+      const response = await join(member.user, { inviteCode: 'JOINQA' })
+      assert.equal(response.result.teamId, teamRef.id)
+    }
+    const fullTeam = (await getDoc(teamRef)).data()
+    assert.deepEqual(
+      fullTeam.memberIds,
+      [a, b, c, d, e].map((member) => member.user.uid),
+    )
+    const sixth = await join(f.user, { inviteCode: 'JOINQA' })
+    assert.equal(sixth.error.status, 'FAILED_PRECONDITION')
+    assert.match(sixth.error.message, /定員（5人）/)
+    await denied(getDoc(doc(f.db, teamRef.path)))
+    assert.equal((await join(b.user, { inviteCode: 'JOINQA' })).result.teamId, teamRef.id)
+    assert.deepEqual((await getDoc(teamRef)).data(), fullTeam)
+
+    // 残り1枠に2人が同時参加しても、既存メンバーを保ったまま5人に収まる。
+    const raceRef = doc(collection(a.db, 'teams'))
+    await setDoc(raceRef, { ...team, inviteCode: 'RACEQA' })
+    for (const member of [b, c, d]) {
+      assert.equal((await join(member.user, { inviteCode: 'RACEQA' })).result.teamId, raceRef.id)
+    }
+    const concurrent = await Promise.all([
+      join(e.user, { inviteCode: 'RACEQA' }),
+      join(f.user, { inviteCode: 'RACEQA' }),
+    ])
+    assert.equal(concurrent.filter((response) => response.result?.teamId === raceRef.id).length, 1)
+    assert.equal(
+      concurrent.filter((response) => response.error?.status === 'FAILED_PRECONDITION').length,
+      1,
+    )
+    const racedMembers = (await getDoc(raceRef)).data().memberIds
+    assert.equal(racedMembers.length, 5)
+    assert.equal(new Set(racedMembers).size, 5)
+    for (const member of [a, b, c, d]) assert.ok(racedMembers.includes(member.user.uid))
+    const winner = concurrent[0].result ? e : f
+    assert.ok(racedMembers.includes(winner.user.uid))
+    console.log('PASS: 5人目の参加、6人目の拒否、満員での再入力、残り1枠への同時参加')
+
     await setDoc(doc(collection(a.db, 'teams')), team)
     assert.equal((await join(b.user, { inviteCode: 'JOINQA' })).error.status, 'FAILED_PRECONDITION')
     console.log(

@@ -3,12 +3,24 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Timestamp } from 'firebase/firestore'
 import { useCurrentUser } from 'vuefire'
-import { Check, Pencil, Plus, Trash2, Swords, Skull, Users, Clock } from 'lucide-vue-next'
+import {
+  Check,
+  Copy,
+  KeyRound,
+  Pencil,
+  Plus,
+  Trash2,
+  Swords,
+  Skull,
+  Users,
+  Clock,
+} from 'lucide-vue-next'
 import {
   createTaskInput,
   updateTaskInput,
   taskStatusSchema,
   updateTeamHostageInput,
+  MAX_TEAM_MEMBERS,
   type Task,
 } from '@hitojichi/shared'
 import { useTeamTasks } from '@/composables/useTeamTasks'
@@ -36,6 +48,32 @@ const { titles } = useTitles()
 const isTasksPending = computed(() => tasks.pending.value)
 const isTeamPending = computed(() => team.pending.value)
 const loadError = computed(() => team.error.value || tasks.error.value)
+// 募集表示は最新のチーム情報を使い、満員になったら招待コードも隠す。
+const canInvite = computed(
+  () =>
+    !isTeamPending.value &&
+    !team.error.value &&
+    !!team.value?.inviteCode &&
+    team.value.memberIds.length < MAX_TEAM_MEMBERS,
+)
+const copyMessage = ref('')
+
+async function copyInviteCode() {
+  const code = team.value?.inviteCode
+  if (!canInvite.value || !code) return
+  const teamId = props.teamId
+  copyMessage.value = ''
+  try {
+    // 標準のClipboard APIを使い、失敗時は手動コピーできる案内を表示する。
+    await navigator.clipboard.writeText(code)
+    if (props.teamId === teamId) copyMessage.value = 'コピーしました'
+  } catch (error) {
+    console.error(error)
+    if (props.teamId === teamId)
+      copyMessage.value = 'コピーできませんでした。招待コードを選択してコピーしてください。'
+  }
+}
+
 const activeFilter = ref<'all' | 'unfinished' | 'done'>('all')
 const filters = [
   { value: 'all', label: 'すべて' },
@@ -202,6 +240,7 @@ const taskErrorMessage = ref('')
 watch(
   () => props.teamId,
   () => {
+    copyMessage.value = ''
     editingTaskId.value = null
     taskErrorMessage.value = ''
     activeFilter.value = 'all'
@@ -314,6 +353,33 @@ async function onComplete(task: Task & { id: string }) {
     <p v-else-if="!isTeamPending && !team" role="status" class="task-panel">
       チームが見つかりません。チーム一覧から選び直してください。
     </p>
+    <section v-if="canInvite" class="task-panel" aria-label="チームの招待">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="min-w-0">
+          <h2 class="flex items-center gap-2 font-display text-sm">
+            <KeyRound :size="18" aria-hidden="true" />招待コード
+          </h2>
+          <p class="mt-2">
+            <code class="font-dot text-xl break-all tracking-widest select-all">{{
+              team?.inviteCode
+            }}</code>
+          </p>
+          <p class="mt-2 text-xs text-ink/70">
+            {{ team?.memberIds.length }} / {{ MAX_TEAM_MEMBERS }}人参加中。仲間を招待しよう。
+          </p>
+        </div>
+        <button
+          type="button"
+          class="flex items-center gap-2 px-4 py-2 text-sm"
+          @click="copyInviteCode"
+        >
+          <Copy :size="18" aria-hidden="true" />招待コードをコピー
+        </button>
+      </div>
+      <p v-if="copyMessage" role="status" class="mt-3 text-sm font-bold text-primary">
+        {{ copyMessage }}
+      </p>
+    </section>
     <section v-if="team" class="hostage-panel task-panel" aria-label="このチームの人質">
       <div class="flex flex-wrap items-center gap-3">
         <span class="hostage-icon" aria-hidden="true"><Skull :size="22" /></span>

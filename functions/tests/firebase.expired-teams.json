@@ -1,0 +1,9 @@
+{
+  "emulators": {
+    "firestore": { "port": 8186 },
+    "hub": { "port": 4415 },
+    "logging": { "port": 4515 },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
+  }
+}

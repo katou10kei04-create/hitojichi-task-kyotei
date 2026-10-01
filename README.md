@@ -52,6 +52,27 @@ Functionsを書き換えたら、別ターミナルで `npm run fn:watch` を動
 
 ## その他のコマンド
 
+### 期限切れチームの自動削除
+
+`cleanupExpiredTeams` は毎日午前0時（日本時間）に、チーム期限 `goalDueDate` から7日経過したチームと配下のタスクを削除します。例：期限が `2026-10-01` なら `2026-10-08` 午前0時から対象です。期限未設定の既存チームは残します。
+
+Emulatorでは定期処理が自動実行されないため、ログイン後に `runExpiredTeamCleanup` を手動で呼び出せます（本番では実行不可）。フロントのコードから呼ぶ例：
+
+```ts
+import { httpsCallable } from 'firebase/functions'
+import { functions } from '@/lib/firebase'
+
+const result = await httpsCallable(functions, 'runExpiredTeamCleanup')()
+console.log(result.data) // { deletedTeamCount: 削除したチーム数 }
+```
+
+専用のFirestore Emulatorで自動テストする場合：
+
+```bash
+npm run build -w functions
+npx firebase emulators:exec --config functions/tests/firebase.expired-teams.json --only firestore --project demo-expired-team-tests "node functions/tests/expired-teams.cjs"
+```
+
 ```bash
 npm run build    # web + functions のビルド
 npm run lint     # web の Lint（oxlint + eslint）

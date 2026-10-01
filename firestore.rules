@@ -23,12 +23,16 @@ service cloud.firestore {
     }
 
     // プロフィール：ログインユーザーなら閲覧可、本人のみ更新可。称号(titleIds)はFunctionsのみ変更可
+    // 装備する称号(equippedTitleId)は、外す(null)か獲得済みの称号のみ
     match /users/{uid} {
       allow read: if signedIn();
       allow create: if signedIn() && request.auth.uid == uid
         && request.resource.data.titleIds.size() == 0;
       allow update: if signedIn() && request.auth.uid == uid
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['titleIds']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['titleIds'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['equippedTitleId'])
+          || request.resource.data.equippedTitleId == null
+          || request.resource.data.equippedTitleId in resource.data.titleIds);
     }
 
     // チーム：メンバーのみ閲覧・更新可

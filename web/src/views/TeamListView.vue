@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { FirebaseError } from 'firebase/app'
 import { Crown, KeyRound, Link2, Plus, Skull, Trophy, Users } from 'lucide-vue-next'
+import { isAchievementTitle } from '@hitojichi/shared'
 import { useTeams } from '@/composables/useTeams'
 import { useCurrentUserProfile } from '@/composables/useCurrentUserProfile'
 import { useTitles } from '@/composables/useTitles'
@@ -41,7 +42,14 @@ const equippedTitleStat = computed<Stat>(() => {
 const disTitleStat = computed<Stat>(() => {
   if (profile.error.value) return { value: '取得失敗' }
   if (profile.pending.value) return { value: '読み込み中…' }
-  return { value: String(profile.value?.titleIds.length ?? 0), unit: '件' }
+  if (titles.error.value) return { value: '取得失敗' }
+  if (titles.pending.value) return { value: '読み込み中…' }
+  // 実績の称号は除いて数える
+  const ownedIds = new Set(profile.value?.titleIds ?? [])
+  const count = titles.value.filter(
+    (title) => ownedIds.has(title.id) && !isAchievementTitle(title),
+  ).length
+  return { value: String(count), unit: '件' }
 })
 // 見出し「〇〇のチーム」。表示名が読み込めるまでは「チーム」だけ出す
 const teamHeading = computed(() => {

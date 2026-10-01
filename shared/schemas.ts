@@ -44,15 +44,27 @@ export const taskSchema = z.object({
 export type Task = z.infer<typeof taskSchema>
 
 /** titles/{titleId}（称号マスタ） */
+export const titleKindSchema = z.enum(['achievement', 'dis'])
 export const titleSchema = z.object({
   name: z.string(),
   description: z.string(),
+  kind: titleKindSchema.optional(), // 実績 or dis称号。未設定の既存称号はdis称号として扱う
+  requiredDoneCount: z.number().int().positive().optional(), // 実績のみ：獲得に必要な完了タスク数
 })
 export type Title = z.infer<typeof titleSchema>
+
+/** 実績の称号か（dis称号でないか）。kind未設定の既存称号はdis称号 */
+export function isAchievementTitle(title: Pick<Title, 'kind'>) {
+  return title.kind === 'achievement'
+}
 
 /** フォーム入力用 */
 export const updateUserProfileInput = userSchema.pick({ displayName: true, bio: true })
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileInput>
+export const updateEquippedTitleInput = z.object({
+  equippedTitleId: z.string().min(1).nullable(), // nullで装備を外す
+})
+export type UpdateEquippedTitleInput = z.infer<typeof updateEquippedTitleInput>
 export const createTeamInput = teamSchema
   .pick({ name: true, goal: true, goalDueDate: true, selfDisTitleId: true, teamDisTitleId: true })
   .required({ goal: true, goalDueDate: true })

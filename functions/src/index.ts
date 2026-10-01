@@ -40,8 +40,15 @@ export const joinTeamByInviteCode = onCall(async (request): Promise<JoinTeamResu
   })
 })
 
-// TODO(key): エミュレータでは onSchedule が自動で動かないため、デモ・動作確認用に同じ処理を呼べる onCall があると便利
 export const checkOverdueTasks = onSchedule('every 1 minutes', async () => {
+  await processOverdueTasks(getFirestore(), Timestamp.now())
+})
+
+// エミュレータでは onSchedule が自動で動かないため、動作確認用に同じ処理を手動で呼ぶ。本番では使えない
+export const runOverdueCheck = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です')
+  if (process.env.FUNCTIONS_EMULATOR !== 'true')
+    throw new HttpsError('permission-denied', 'エミュレータでのみ実行できます')
   await processOverdueTasks(getFirestore(), Timestamp.now())
 })
 

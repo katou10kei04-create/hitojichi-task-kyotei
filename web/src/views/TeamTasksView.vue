@@ -14,6 +14,7 @@ import {
 import { useTeamTasks } from '@/composables/useTeamTasks'
 import { useTeamMembers } from '@/composables/useTeamMembers'
 import { useTitles } from '@/composables/useTitles'
+import { useOverdueCheck } from '@/composables/useOverdueCheck'
 import HostageTitleFields from '@/components/HostageTitleFields.vue'
 
 const props = defineProps<{ teamId: string }>()
@@ -33,6 +34,13 @@ const {
 const memberIds = computed(() => team.value?.memberIds)
 const members = useTeamMembers(memberIds)
 const { titles } = useTitles()
+// エミュレータでは期限切れ判定が自動で動かないので、手動で実行するボタンを出す
+const {
+  isAvailable: canRunOverdueCheck,
+  isRunning: isRunningOverdueCheck,
+  error: overdueCheckError,
+  runOverdueCheck,
+} = useOverdueCheck()
 const isTasksPending = computed(() => tasks.pending.value)
 const isTeamPending = computed(() => team.pending.value)
 const loadError = computed(() => team.error.value || tasks.error.value)
@@ -325,6 +333,20 @@ async function onComplete(task: Task & { id: string }) {
           <p v-if="overdueCount" class="mt-1 text-sm font-bold">
             期限切れのタスクが {{ overdueCount }} 件あります。
           </p>
+          <div v-if="canRunOverdueCheck" class="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="flex items-center gap-1 px-3 py-1 text-xs"
+              :disabled="isRunningOverdueCheck"
+              @click="runOverdueCheck"
+            >
+              <Clock :size="14" aria-hidden="true" />
+              {{ isRunningOverdueCheck ? '判定中…' : '期限切れを判定（開発用）' }}
+            </button>
+            <p v-if="overdueCheckError" role="alert" class="text-xs font-bold text-red-600">
+              {{ overdueCheckError }}
+            </p>
+          </div>
         </div>
         <button
           v-if="isCreator && !isEditingHostage"

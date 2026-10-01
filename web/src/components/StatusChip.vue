@@ -5,7 +5,7 @@ import type { Component } from 'vue'
 withDefaults(
   defineProps<{
     icon?: Component
-    tone?: 'outline' | 'muted' | 'accent' | 'ink'
+    tone?: 'outline' | 'muted' | 'accent' | 'ink' | 'primary'
   }>(),
   { icon: undefined, tone: 'outline' },
 )
@@ -15,6 +15,7 @@ const toneClass = {
   muted: 'border-ink bg-muted text-ink',
   accent: 'border-ink bg-accent text-ink',
   ink: 'border-ink bg-ink text-accent',
+  primary: 'border-ink bg-primary text-white',
 }
 </script>
 

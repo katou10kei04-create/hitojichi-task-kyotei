@@ -5,11 +5,12 @@
 import { initializeApp } from 'firebase-admin/app'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { setGlobalOptions } from 'firebase-functions/v2'
-import { onDocumentCreated } from 'firebase-functions/v2/firestore'
+import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore'
 import { joinTeamInput, type JoinTeamResult } from '@hitojichi/shared'
 import { processOverdueTask, processOverdueTasks } from './overdueTasks'
+import { grantAchievementTitles } from './achievementTitles'
 
 initializeApp()
 setGlobalOptions({ region: 'asia-northeast1' })
@@ -51,5 +52,16 @@ export const checkOverdueTaskOnCreate = onDocumentCreated(
   async (event) => {
     if (!event.data) return
     await processOverdueTask(getFirestore(), event.data.ref, Timestamp.now())
+  },
+)
+
+// タスクが完了になったら、完了数に応じた実績の称号を付与する。
+export const grantAchievementTitlesOnTaskDone = onDocumentUpdated(
+  'teams/{teamId}/tasks/{taskId}',
+  async (event) => {
+    const before = event.data?.before.data()
+    const after = event.data?.after.data()
+    if (!after || after.status !== 'done' || before?.status === 'done') return
+    await grantAchievementTitles(getFirestore(), after.ownerId)
   },
 )

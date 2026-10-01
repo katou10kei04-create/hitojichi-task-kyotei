@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import { computed, ref, useId } from 'vue'
 import { Check, ChevronRight, Shield, Skull, Trophy, X } from 'lucide-vue-next'
+import { isAchievementTitle } from '@hitojichi/shared'
 import { useTitles } from '@/composables/useTitles'
 import IconTile from '@/components/IconTile.vue'
 
 const selfDisTitleId = defineModel<string>('selfDisTitleId', { required: true })
 const teamDisTitleId = defineModel<string>('teamDisTitleId', { required: true })
-const { titles } = useTitles()
+const { titles: allTitles } = useTitles()
+// 人質に選べるのはdis称号だけ（実績の称号は除く）
+const titles = computed(() => allTitles.value.filter((title) => !isAchievementTitle(title)))
 const dialog = ref<HTMLDialogElement | null>(null)
 const dialogHeadingId = useId()
 const activeField = ref<'self' | 'team'>('self')
 const selectedId = computed(() =>
   activeField.value === 'self' ? selfDisTitleId.value : teamDisTitleId.value,
 )
-const isPending = computed(() => titles.pending.value)
-const loadError = computed(() => titles.error.value)
+const isPending = computed(() => allTitles.pending.value)
+const loadError = computed(() => allTitles.error.value)
 const fields = computed(() => [
   {
     key: 'self' as const,

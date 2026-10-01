@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { signOut } from 'firebase/auth'
 import { useCurrentUser } from 'vuefire'
 import { Check, Crown, Link2, LogOut, Skull, UserRound } from 'lucide-vue-next'
-import { updateUserProfileInput } from '@hitojichi/shared'
+import { isAchievementTitle, updateUserProfileInput } from '@hitojichi/shared'
 import { auth } from '@/lib/firebase'
 import { useCurrentUserProfile } from '@/composables/useCurrentUserProfile'
 import { useTitles } from '@/composables/useTitles'
@@ -36,9 +36,12 @@ const ownedTitles = computed(() => {
   const ownedIds = new Set(profile.value?.titleIds ?? [])
   return titles.value.filter((title) => ownedIds.has(title.id))
 })
+const ownedDisTitles = computed(() =>
+  ownedTitles.value.filter((title) => !isAchievementTitle(title)),
+)
 // 装備中の称号は王冠付きで別に出すので、dis称号の並びからは除く
 const disTitles = computed(() =>
-  ownedTitles.value.filter((title) => title.id !== equippedTitle.value?.id),
+  ownedDisTitles.value.filter((title) => title.id !== equippedTitle.value?.id),
 )
 
 // カード下の数値。読み込み中は「…」、取得に失敗したら「—」を出す
@@ -55,8 +58,8 @@ const titlesLoadState = computed(() => {
 const titleStat = computed(
   () => titlesLoadState.value ?? `${ownedTitles.value.length}/${titles.value.length}`,
 )
-// 今の称号マスタはすべてdis称号なので、獲得した称号の数をそのまま出す（チーム一覧のサマリーと同じ数え方）
-const disStat = computed(() => titlesLoadState.value ?? String(ownedTitles.value.length))
+// 実績の称号を除いた、付いているdis称号の数（チーム一覧のサマリーと同じ数え方）
+const disStat = computed(() => titlesLoadState.value ?? String(ownedDisTitles.value.length))
 const stats = computed(() => [
   { label: '達成', value: completedStat.value },
   { label: '称号', value: titleStat.value },

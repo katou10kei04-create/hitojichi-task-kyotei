@@ -38,6 +38,8 @@ export const taskSchema = z.object({
   ownerId: z.string().min(1), // タスクを追加した本人
   dueAt: z.date(),
   status: taskStatusSchema,
+  completedLate: z.boolean().optional(), // 完了時の期限超過。未完了に戻すとfalse。既存タスクは未設定
+  completedAfterOverdue: z.boolean().optional(), // 旧データの表示互換用。新規書き込みには使わない
 })
 export type Task = z.infer<typeof taskSchema>
 

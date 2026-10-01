@@ -1,6 +1,43 @@
-import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore'
+import {
+  FieldValue,
+  Timestamp,
+  type DocumentReference,
+  type Firestore,
+} from 'firebase-admin/firestore'
 import { taskSchema, teamSchema } from '@hitojichi/shared'
 import { logger } from 'firebase-functions'
+
+/** 作成トリガーと定期チェックで共有。最新状態を読み直して二重付与を防ぐ。 */
+export async function processOverdueTask(
+  db: Firestore,
+  taskRef: DocumentReference,
+  now: Timestamp,
+) {
+  const teamRef = taskRef.parent.parent
+  if (!teamRef || teamRef.parent.path !== 'teams') return
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(taskRef)
+    const data = snapshot.data()
+    // 完了・削除・期限延長が先に確定した場合は付与しない。
+    if (!data || data.status !== 'todo') return
+    const task = taskSchema.parse({
+      ...data,
+      dueAt: data.dueAt instanceof Timestamp ? data.dueAt.toDate() : data.dueAt,
+    })
+    if (task.dueAt.getTime() > now.toMillis()) return
+    const team = teamSchema.parse((await transaction.get(teamRef)).data())
+    transaction.update(db.doc(`users/${task.ownerId}`), {
+      titleIds: FieldValue.arrayUnion(team.selfDisTitleId),
+    })
+    for (const uid of new Set(team.memberIds)) {
+      if (uid === task.ownerId) continue
+      transaction.update(db.doc(`users/${uid}`), {
+        titleIds: FieldValue.arrayUnion(team.teamDisTitleId),
+      })
+    }
+    transaction.update(taskRef, { status: 'overdue' })
+  })
+}
 
 /**
  * 状態変更と称号付与を同時に確定し、再実行・同時実行でも一度だけ処理する。
@@ -20,28 +57,7 @@ export async function processOverdueTasks(db: Firestore, now: Timestamp) {
       const teamRef = candidate.ref.parent.parent
       if (!teamRef || teamRef.parent.path !== 'teams') continue
       try {
-        await db.runTransaction(async (transaction) => {
-          const snapshot = await transaction.get(candidate.ref)
-          const data = snapshot.data()
-          // 完了・削除・期限延長が先に確定した場合は付与しない。
-          if (!data || data.status !== 'todo') return
-          const task = taskSchema.parse({
-            ...data,
-            dueAt: data.dueAt instanceof Timestamp ? data.dueAt.toDate() : data.dueAt,
-          })
-          if (task.dueAt.getTime() > now.toMillis()) return
-          const team = teamSchema.parse((await transaction.get(teamRef)).data())
-          transaction.update(db.doc(`users/${task.ownerId}`), {
-            titleIds: FieldValue.arrayUnion(team.selfDisTitleId),
-          })
-          for (const uid of new Set(team.memberIds)) {
-            if (uid === task.ownerId) continue
-            transaction.update(db.doc(`users/${uid}`), {
-              titleIds: FieldValue.arrayUnion(team.teamDisTitleId),
-            })
-          }
-          transaction.update(candidate.ref, { status: 'overdue' })
-        })
+        await processOverdueTask(db, candidate.ref, now)
       } catch (error) {
         // 不整合のある1件で他のタスクの判定を止めない。失敗分は次回再判定。
         failed = true

@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   runTransaction,
+  Timestamp,
   updateDoc,
   type CollectionReference,
 } from 'firebase/firestore'
@@ -50,13 +51,32 @@ export function useTeamTasks(teamId: MaybeRefOrGetter<string>) {
     const uid = currentUser.value?.uid
     if (!uid) throw new Error('ログインが必要です')
 
-    const task = taskSchema.parse({ ...input, ownerId: uid, status: 'todo' })
+    const task = taskSchema.parse({ ...input, ownerId: uid, status: 'todo', completedLate: false })
+    if (task.dueAt.getTime() <= Date.now()) throw new Error('期限は現在より未来にしてください')
     await addDoc(collection(db, 'teams', toValue(teamId), 'tasks'), task)
   }
 
-  async function completeTask(taskId: string) {
-    await updateDoc(doc(db, 'teams', toValue(teamId), 'tasks', taskId), {
-      status: 'done',
+  async function setTaskStatus(taskId: string, status: 'todo' | 'done') {
+    const uid = currentUser.value?.uid
+    if (!uid) throw new Error('ログインが必要です')
+    const taskRef = doc(db, 'teams', toValue(teamId), 'tasks', taskId)
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(taskRef)
+      if (!snapshot.exists()) throw new Error('タスクが見つかりません')
+      const task = snapshot.data()
+      if (task.ownerId !== uid) throw new Error('自分のタスクのみ状態変更できます')
+      if (task.status === status) return
+      if (!(
+        (status === 'done' && (task.status === 'todo' || task.status === 'overdue')) ||
+        (status === 'todo' && task.status === 'done')
+      ))
+        throw new Error('この状態変更はできません')
+      const dueAt = task.dueAt instanceof Timestamp ? task.dueAt.toDate() : task.dueAt
+      transaction.update(taskRef, {
+        status,
+        completedLate:
+          status === 'done' && (task.status === 'overdue' || dueAt.getTime() <= Date.now()),
+      })
     })
   }
 
@@ -97,7 +117,7 @@ export function useTeamTasks(teamId: MaybeRefOrGetter<string>) {
     teamProgress,
     isCreator,
     createTask,
-    completeTask,
+    setTaskStatus,
     updateTask,
     deleteTask,
     updateHostage,

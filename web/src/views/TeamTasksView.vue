@@ -27,6 +27,7 @@ import { useTeamTasks } from '@/composables/useTeamTasks'
 import { useTeamMembers } from '@/composables/useTeamMembers'
 import { useTitles } from '@/composables/useTitles'
 import HostageTitleFields from '@/components/HostageTitleFields.vue'
+import IconTile from '@/components/IconTile.vue'
 
 const props = defineProps<{ teamId: string }>()
 
@@ -356,8 +357,9 @@ async function onComplete(task: Task & { id: string }) {
     <section v-if="canInvite" class="task-panel" aria-label="チームの招待">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="min-w-0">
-          <h2 class="flex items-center gap-2 font-display text-sm">
-            <KeyRound :size="18" aria-hidden="true" />招待コード
+          <h2 class="flex items-center gap-3 font-display text-sm">
+            <!-- 共通の見出しと同じ部品で、アイコンの太枠と影を揃える。 -->
+            <IconTile :icon="KeyRound" tone="accent" />招待コード
           </h2>
           <p class="mt-2">
             <code class="font-dot text-xl break-all tracking-widest select-all">{{
@@ -365,7 +367,7 @@ async function onComplete(task: Task & { id: string }) {
             }}</code>
           </p>
           <p class="mt-2 text-xs text-ink/70">
-            {{ team?.memberIds.length }} / {{ MAX_TEAM_MEMBERS }}人参加中。仲間を招待しよう。
+            {{ team?.memberIds.length }} / {{ MAX_TEAM_MEMBERS }}人参加中　仲間を招待しよう！
           </p>
         </div>
         <button

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ArrowRight, CalendarDays, Flag, Flame, Layers, Link2, Users } from 'lucide-vue-next'
-import type { Team } from '@hitojichi/shared'
+import { MAX_TEAM_MEMBERS, type Team } from '@hitojichi/shared'
 import type { TeamTaskSummary } from '@/composables/useTeamTaskSummaries'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseCard from '@/components/BaseCard.vue'
@@ -18,8 +18,8 @@ const props = defineProps<{
   loadFailed?: boolean
 }>()
 
-// 相手（人質）がまだ参加していなければ「募集中」
-const isRecruiting = computed(() => props.team.memberIds.length < 2)
+// 招待で参加できる空きがある間は、人数上限と同じ条件で「募集中」にする。
+const isRecruiting = computed(() => props.team.memberIds.length < MAX_TEAM_MEMBERS)
 
 // 大目標の設定前に作られたチームだけ、従来どおりタスクから期限を表示する。
 const dueDateLabel = computed(() => {
@@ -42,14 +42,14 @@ const dueDateLabel = computed(() => {
           v-else-if="isRecruiting"
           :icon="Link2"
           tone="muted"
-          title="人質となる相手がまだ参加していません"
+          title="チームメンバーを募集しています"
         >
           募集中
         </StatusChip>
         <StatusChip v-else :icon="Flame" tone="accent" title="人質となる相手が参加済みです">
           進行中
         </StatusChip>
-        <StatusChip :icon="Users">{{ team.memberIds.length }} / 2</StatusChip>
+        <StatusChip :icon="Users">{{ team.memberIds.length }} / {{ MAX_TEAM_MEMBERS }}</StatusChip>
       </div>
     </div>
 

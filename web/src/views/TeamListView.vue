@@ -93,6 +93,7 @@ async function submitJoin() {
     closeJoinDialog()
     joinMessage.value = `「${teamName}」に参加しました（参加済みの場合もそのまま利用できます）。`
   } catch (error) {
+    // SDKが末尾に付けるHTTPステータスを表示から外し、参加できない理由だけを伝える。
     joinError.value =
       error instanceof FirebaseError &&
       [
@@ -101,7 +102,7 @@ async function submitJoin() {
         'functions/unauthenticated',
         'functions/invalid-argument',
       ].includes(error.code)
-        ? error.message
+        ? error.message.replace(/ \[\d{3}\]$/, '')
         : '参加に失敗しました。招待コードを確認して、もう一度お試しください。'
   } finally {
     isJoining.value = false

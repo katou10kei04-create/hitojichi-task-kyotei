@@ -8,7 +8,7 @@ import { setGlobalOptions } from 'firebase-functions/v2'
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore'
-import { joinTeamInput, type JoinTeamResult } from '@hitojichi/shared'
+import { joinTeamInput, MAX_TEAM_MEMBERS, type JoinTeamResult } from '@hitojichi/shared'
 import { processOverdueTask, processOverdueTasks } from './overdueTasks'
 import { grantAchievementTitles } from './achievementTitles'
 
@@ -36,8 +36,18 @@ export const joinTeamByInviteCode = onCall(async (request): Promise<JoinTeamResu
         'failed-precondition',
         '招待コードが重複しています。作成者に確認してください',
       )
+    const result: JoinTeamResult = { teamId: team.id, teamName: team.get('name') }
+    const memberIds: string[] = team.get('memberIds')
+    // 参加済みの人は新しい枠を使わないため、満員でも再入力を成功として返す。
+    if (memberIds.includes(uid)) return result
+    // 最新人数をトランザクション内で確認し、残り1枠への同時参加でも上限を守る。
+    if (memberIds.length >= MAX_TEAM_MEMBERS)
+      throw new HttpsError(
+        'failed-precondition',
+        `チームが定員（${MAX_TEAM_MEMBERS}人）に達しているため参加できません`,
+      )
     transaction.update(team.ref, { memberIds: FieldValue.arrayUnion(uid) })
-    return { teamId: team.id, teamName: team.get('name') }
+    return result
   })
 })
 

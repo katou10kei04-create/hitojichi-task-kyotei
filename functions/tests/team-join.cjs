@@ -57,6 +57,8 @@ async function main() {
     const teamRef = doc(collection(a.db, 'teams'))
     const team = {
       name: '招待検証',
+      goal: 'チームでデモを完成させる',
+      goalDueDate: '2026-10-01',
       memberIds: [a.user.uid],
       inviteCode: 'JOINQA',
       createdBy: a.user.uid,
